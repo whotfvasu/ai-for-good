@@ -1,0 +1,4 @@
+# Force LF on shell scripts and Python — CRLF breaks bash and shebangs.
+*.sh   text eol=lf
+*.py   text eol=lf
+*.txt  text eol=lf
