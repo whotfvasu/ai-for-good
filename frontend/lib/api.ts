@@ -22,6 +22,8 @@
 import { mocks } from './mocks'
 import type {
   ConversationTurn,
+  ConversationsResponse,
+  DonorInsight,
   ForecastResponse,
   NotifyDonorResponse,
   RankDonorsResponse,
@@ -114,6 +116,24 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ donor_id, text, language }),
     })
+  },
+
+  // Pull the most recent conversation turns for a donor. Used by the donor
+  // chat page on a 4 s polling cadence so coordinator-triggered notifications
+  // appear live during the demo without a websocket layer.
+  conversations: (donor_id: string, limit = 20) => {
+    if (L2_MOCKS) {
+      return Promise.resolve<ConversationsResponse>({ donor_id, items: [] })
+    }
+    const q = new URLSearchParams({ donor_id, limit: String(limit) })
+    return request<ConversationsResponse>(`/conversations?${q.toString()}`)
+  },
+
+  // Read the donor's distilled cold-memory record. Rendered in the donor chat
+  // as the "About you" pill so the panel can see exactly what Saathi remembers.
+  donorInsight: (donor_id: string) => {
+    if (L2_MOCKS) return Promise.resolve(mocks.donorInsight(donor_id))
+    return request<DonorInsight>(`/donor/${encodeURIComponent(donor_id)}/insight`)
   },
 
   refuse: (body: { donor_id: string; reason_bucket?: Refusal['reason_bucket']; text?: string }) => {

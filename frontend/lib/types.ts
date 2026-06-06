@@ -76,3 +76,28 @@ export interface NotifyDonorResponse {
   channel: string
   language: string
 }
+
+// The cold-memory record — produced by the distill_insight Lambda from up to
+// 30 raw chat turns, stored as a single DynamoDB row per donor, and loaded
+// on every notification call to keep prompt size bounded.
+export interface DonorInsight {
+  donor_id: string
+  engagement_state: 'warm' | 'drifting' | 'dormant' | 'lapsed'
+  preferred_channel: 'whatsapp' | 'sms' | 'voice' | 'email'
+  preferred_language: 'en' | 'hi' | 'te'
+  preferred_time_window: 'morning' | 'evening' | 'weekend' | 'any'
+  name_used: string
+  last_refusal_reason: 'medical' | 'travel' | 'work' | 'fear' | 'tired' | 'trust' | null
+  last_refusal_expires_at: string | null
+  lifetime_donations: number
+  patient_bond: string
+  what_motivates: string[]
+  what_to_avoid: string[]
+  summary_120w: string
+  updated_at: string
+}
+
+export interface ConversationsResponse {
+  donor_id: string
+  items: ConversationTurn[]
+}

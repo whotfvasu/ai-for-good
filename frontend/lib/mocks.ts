@@ -4,6 +4,7 @@
 
 import type {
   ConversationTurn,
+  DonorInsight,
   ForecastResponse,
   NotifyDonorResponse,
   RankDonorsResponse,
@@ -121,5 +122,23 @@ export const mocks = {
     reason_bucket: reason_bucket ?? 'tired',
     text: text ?? '',
     expires_at: new Date(Date.now() + 21 * 86400000).toISOString(),
+  }),
+
+  donorInsight: (donor_id: string): DonorInsight => ({
+    donor_id,
+    engagement_state: 'warm',
+    preferred_channel: 'whatsapp',
+    preferred_language: 'en',
+    preferred_time_window: 'evening',
+    name_used: 'Priya',
+    last_refusal_reason: 'travel',
+    last_refusal_expires_at: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
+    lifetime_donations: 8,
+    patient_bond: 'Has asked about Aarav twice in the last month',
+    what_motivates: ['seeing impact updates', 'knowing the patient by name'],
+    what_to_avoid: ['formal language', 'urgency language'],
+    summary_120w:
+      'Regular O+ donor for three years. Last donation 14 Jul at Apollo Madhapur. Currently travelling till the 15th. Prefers casual messages in the evening. Has bonded with one specific patient family (Aarav).',
+    updated_at: isoNow(),
   }),
 }
