@@ -11,6 +11,14 @@ The Living Blood Network. A predictive, memory-aware AI platform for thalassemia
 - 👤 [PLAN-HARSH.md](PLAN-HARSH.md) — Harsh's plan: backend + data + ML (branch `harsh`)
 - 🗺 [docs/marrow-architecture.excalidraw.md](docs/marrow-architecture.excalidraw.md) — open in Obsidian Excalidraw, or the raw `.excalidraw` at https://excalidraw.com
 
+## Backend implementation prep
+
+- 📄 [openapi.yaml](openapi.yaml) — API Gateway/Lambda contract for Harsh + Vasu mocks
+- 🧱 [docs/SCHEMA.md](docs/SCHEMA.md) — DynamoDB schema mapped to the real CSV fields
+- 🛠 [docs/HARSH-IMPLEMENTATION.md](docs/HARSH-IMPLEMENTATION.md) — Harsh execution order and local caveats
+- 🧪 Local validation: `PYTHONPATH=. python3 -m unittest discover -s ./tests -t . -p 'test_*.py'`
+- 📦 Loader dry-run: `python3 scripts/load_dataset.py --dry-run`
+
 ## Branching
 
 ```

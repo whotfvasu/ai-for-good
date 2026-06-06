@@ -1,0 +1,446 @@
+openapi: 3.0.3
+info:
+  title: Marrow API
+  version: 0.1.0
+  description: Backend contract for Harsh's Marrow Lambda/API Gateway implementation.
+servers:
+  - url: https://api.example.com
+    description: Replace with API Gateway HTTP API URL
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: Service health
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, service]
+                properties:
+                  ok:
+                    type: boolean
+                  service:
+                    type: string
+  /forecast:
+    get:
+      summary: Forecast upcoming patient transfusion demand
+      parameters:
+        - name: window
+          in: query
+          schema:
+            type: integer
+            default: 7
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [date, worry]
+            default: date
+        - name: anchor_date
+          in: query
+          description: Optional ISO date for deterministic local demos against the 2025 dataset.
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Upcoming forecasted patients
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForecastResponse"
+  /rank-donors:
+    get:
+      summary: Rank donors for a patient
+      parameters:
+        - name: patient_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: anchor_date
+          in: query
+          description: Optional ISO date for deterministic scoring.
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Ranked donors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RankDonorsResponse"
+        "400":
+          description: Missing patient_id
+        "404":
+          description: Patient not found
+  /saathi/outreach:
+    post:
+      summary: Generate donor outreach message
+      description: Stubbed in the contract for Vasu; implementation follows Bedrock prompt integration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [donor_id, patient_id, language, register]
+              properties:
+                donor_id:
+                  type: string
+                patient_id:
+                  type: string
+                language:
+                  type: string
+                  example: en
+                register:
+                  type: string
+                  enum: [formal, intimate]
+      responses:
+        "200":
+          description: Generated message
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  model:
+                    type: string
+                  usage:
+                    type: object
+  /nl-query:
+    post:
+      summary: Translate coordinator natural language into a safe donor query
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+      responses:
+        "200":
+          description: Query result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DonorSummary"
+                  interpreted_filter:
+                    type: object
+  /family/ack:
+    post:
+      summary: Mark a family reassurance acknowledgement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cycle_id]
+              properties:
+                cycle_id:
+                  type: string
+      responses:
+        "200":
+          description: Acknowledgement timestamp
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cycle_id:
+                    type: string
+                  family_reassured_at:
+                    type: string
+                    format: date-time
+                  status:
+                    type: string
+  /saathi/chat/open:
+    get:
+      summary: Open donor chat with memory-aware continuity message
+      parameters:
+        - name: donor_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Opening message and recent history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  donor_id:
+                    type: string
+                  opening_message:
+                    type: string
+                  history:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ConversationTurn"
+  /saathi/chat/turn:
+    post:
+      summary: Append a donor chat turn and generate Saathi response
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [donor_id, text]
+              properties:
+                donor_id:
+                  type: string
+                text:
+                  type: string
+                language:
+                  type: string
+      responses:
+        "200":
+          description: Saathi response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationTurn"
+  /conversations:
+    get:
+      summary: Get donor conversation history
+      parameters:
+        - name: donor_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Conversation turns
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  donor_id:
+                    type: string
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ConversationTurn"
+  /refusals:
+    post:
+      summary: Capture structured or free-text donor refusal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [donor_id]
+              properties:
+                donor_id:
+                  type: string
+                reason_bucket:
+                  type: string
+                  enum: [medical, travel, work, fear, tired, trust]
+                text:
+                  type: string
+      responses:
+        "200":
+          description: Stored refusal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Refusal"
+  /donor/{id}/diary:
+    get:
+      summary: Get donor impact diary
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Donor impact events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  donor_id:
+                    type: string
+                  items:
+                    type: array
+                    items:
+                      type: object
+  /coordinator/{id}/pulse:
+    get:
+      summary: Get weekly coordinator pulse summary
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Weekly aggregate and generated summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  coordinator_id:
+                    type: string
+                  stats:
+                    type: object
+                  summary:
+                    type: string
+components:
+  schemas:
+    ForecastResponse:
+      type: object
+      required: [anchor_date, window, items]
+      properties:
+        anchor_date:
+          type: string
+          format: date
+        window:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ForecastItem"
+    ForecastItem:
+      type: object
+      properties:
+        patient_id:
+          type: string
+        blood_group:
+          type: string
+        quantity_required:
+          type: integer
+          nullable: true
+        last_transfusion_date:
+          type: string
+          format: date
+          nullable: true
+        next_needed_date:
+          type: string
+          format: date
+        days_to_needed:
+          type: integer
+        frequency_in_days:
+          type: integer
+          nullable: true
+        confidence:
+          type: string
+          enum: [high, medium]
+        worry_score:
+          type: number
+    RankDonorsResponse:
+      type: object
+      required: [patient_id, anchor_date, items]
+      properties:
+        patient_id:
+          type: string
+        anchor_date:
+          type: string
+          format: date
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RankedDonor"
+    RankedDonor:
+      allOf:
+        - $ref: "#/components/schemas/DonorSummary"
+        - type: object
+          properties:
+            score:
+              type: number
+            factors:
+              type: object
+              properties:
+                eligible:
+                  type: boolean
+                days_since_last:
+                  type: integer
+                  nullable: true
+                responsiveness:
+                  type: number
+                distance_km:
+                  type: number
+                  nullable: true
+                group_compat:
+                  type: number
+                recency_weight:
+                  type: number
+    DonorSummary:
+      type: object
+      properties:
+        donor_id:
+          type: string
+        blood_group:
+          type: string
+        donor_type:
+          type: string
+          nullable: true
+    ConversationTurn:
+      type: object
+      properties:
+        donor_id:
+          type: string
+        ts:
+          type: string
+          format: date-time
+        role:
+          type: string
+          enum: [user, saathi, coordinator, family]
+        text:
+          type: string
+        lang:
+          type: string
+        meta:
+          type: object
+    Refusal:
+      type: object
+      properties:
+        donor_id:
+          type: string
+        ts:
+          type: string
+          format: date-time
+        reason_bucket:
+          type: string
+          enum: [medical, travel, work, fear, tired, trust]
+        text:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
