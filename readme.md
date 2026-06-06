@@ -18,6 +18,8 @@ The Living Blood Network. A predictive, memory-aware AI platform for thalassemia
 - 🛠 [docs/HARSH-IMPLEMENTATION.md](docs/HARSH-IMPLEMENTATION.md) — Harsh execution order and local caveats
 - 🧪 Local validation: `PYTHONPATH=. python3 -m unittest discover -s ./tests -t . -p 'test_*.py'`
 - 📦 Loader dry-run: `python3 scripts/load_dataset.py --dry-run`
+- ☁️ AWS table setup: `python3 scripts/create_dynamodb_tables.py`
+- 🚚 DynamoDB load: `python3 scripts/load_dataset.py`
 
 ## Branching
 
