@@ -3,12 +3,16 @@
 // openapi.yaml exactly.
 
 import type {
+  BridgeResponse,
   ConversationTurn,
+  Cycle,
+  CyclesResponse,
   DonorInsight,
   ForecastResponse,
   NotifyDonorResponse,
   RankDonorsResponse,
   Refusal,
+  RunSummary,
   SaathiOutreachResponse,
 } from './types'
 
@@ -122,6 +126,87 @@ export const mocks = {
     reason_bucket: reason_bucket ?? 'tired',
     text: text ?? '',
     expires_at: new Date(Date.now() + 21 * 86400000).toISOString(),
+  }),
+
+  bridge: (patient_id: string): BridgeResponse => ({
+    patient_id,
+    bridge_id: 'bridge_demo',
+    bridge_blood_group: 'O Positive',
+    next_needed_date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10),
+    pool_size: 6,
+    ready_count: 2,
+    donors: demoDonors.slice(0, 6).map((d, i) => ({
+      donor_id: d.id,
+      blood_group: 'O Positive',
+      donor_type: i % 2 === 0 ? 'Bridge Donor' : 'Regular Donor',
+      rotation_state: i < 2 ? 'ready' : i < 4 ? 'recently_donated' : 'resting',
+      eligible: i < 2,
+      days_since_last: 95 - i * 12,
+      responsiveness: 0.8 - i * 0.08,
+      last_bridge_donation_date: '2025-05-12',
+      score: 0.9 - i * 0.1,
+    })),
+  }),
+
+  runCycles: (): RunSummary => ({
+    anchor_date: today(),
+    window: 14,
+    summary: { created: 12, auto_running: 9, needs_coordinator: 3, resolved: 0, skipped: 0 },
+  }),
+
+  cycles: (state?: string): CyclesResponse => {
+    const make = (i: number, st: Cycle['state']): Cycle => ({
+      cycle_id: `${demoPatients[i % 3].id}::2025-08-${18 + i}`,
+      patient_id: demoPatients[i % 3].id,
+      bridge_id: 'bridge_demo',
+      bridge_blood_group: 'O Positive',
+      assigned_donor_id: st === 'needs_coordinator' ? null : demoDonors[i % demoDonors.length].id,
+      next_needed_date: `2025-08-${18 + i}`,
+      donor_status: st === 'resolved' ? 'confirmed' : 'pending',
+      patient_status: st === 'resolved' ? 'confirmed' : 'pending',
+      state: st,
+      note:
+        st === 'needs_coordinator'
+          ? 'No bridge donor is eligible right now — needs a human to widen the search.'
+          : st === 'resolved'
+            ? 'Donor and patient both confirmed.'
+            : 'Donor assigned from bridge rotation. Awaiting confirmation.',
+      updated_at: isoNow(),
+    })
+    const all: Cycle[] = [
+      ...Array.from({ length: 9 }, (_, i) => make(i, 'auto_running')),
+      ...Array.from({ length: 3 }, (_, i) => make(i + 9, 'needs_coordinator')),
+    ]
+    const items = state ? all.filter(c => c.state === state) : all
+    return { items, counts: { auto_running: 9, needs_coordinator: 3, resolved: 0 } }
+  },
+
+  confirm: (cycle_id: string, party: 'donor' | 'patient', decision: 'yes' | 'no'): Cycle => ({
+    cycle_id,
+    patient_id: demoPatients[0].id,
+    bridge_id: 'bridge_demo',
+    bridge_blood_group: 'O Positive',
+    assigned_donor_id: demoDonors[0].id,
+    next_needed_date: '2025-08-18',
+    donor_status: party === 'donor' ? (decision === 'yes' ? 'confirmed' : 'declined') : 'pending',
+    patient_status: party === 'patient' ? (decision === 'yes' ? 'confirmed' : 'pending') : 'pending',
+    state: 'auto_running',
+    note: 'Updated.',
+    updated_at: isoNow(),
+  }),
+
+  assignCycle: (cycle_id: string, donor_id: string): Cycle => ({
+    cycle_id,
+    patient_id: demoPatients[0].id,
+    bridge_id: 'bridge_demo',
+    bridge_blood_group: 'O Positive',
+    assigned_donor_id: donor_id,
+    next_needed_date: '2025-08-18',
+    donor_status: 'pending',
+    patient_status: 'pending',
+    state: 'auto_running',
+    note: 'Coordinator manually assigned a donor.',
+    updated_at: isoNow(),
   }),
 
   donorInsight: (donor_id: string): DonorInsight => ({

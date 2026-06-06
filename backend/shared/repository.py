@@ -60,6 +60,8 @@ class CsvRepository:
                     quantity_required=parse_int(row.get("quantity_required")),
                     gender=row.get("gender") or None,
                     status=row.get("status") or None,
+                    bridge_id=_clean_id(row.get("bridge_id")) or None,
+                    bridge_blood_group=row.get("bridge_blood_group") or None,
                 )
             )
 
@@ -97,6 +99,9 @@ class CsvRepository:
                     calls_to_donations_ratio=parse_float(row.get("calls_to_donations_ratio")),
                     active_status=row.get("user_donation_active_status") or None,
                     inactive_trigger_comment=row.get("inactive_trigger_comment") or None,
+                    bridge_id=_clean_id(row.get("bridge_id")) or None,
+                    bridge_blood_group=row.get("bridge_blood_group") or None,
+                    last_bridge_donation_date=parse_date(row.get("last_bridge_donation_date")),
                 )
             )
 
@@ -109,6 +114,16 @@ class CsvRepository:
     def donor(self, donor_id: str) -> Donor | None:
         normalized_id = _clean_id(donor_id)
         return next((donor for donor in self.donors() if donor.donor_id == normalized_id), None)
+
+    def donors_in_bridge(self, bridge_id: str) -> list[Donor]:
+        target = _clean_id(bridge_id)
+        return [d for d in self.donors() if d.bridge_id == target]
+
+    def bridge_for_patient(self, patient_id: str) -> tuple[Patient | None, list[Donor]]:
+        patient = self.patient(patient_id)
+        if patient is None or not patient.bridge_id:
+            return patient, []
+        return patient, self.donors_in_bridge(patient.bridge_id)
 
     def _read_rows(self) -> list[dict[str, str]]:
         with self.dataset_path.open(newline="", encoding="utf-8-sig") as dataset:
@@ -126,6 +141,12 @@ class Repository(Protocol):
         ...
 
     def donor(self, donor_id: str) -> Donor | None:
+        ...
+
+    def donors_in_bridge(self, bridge_id: str) -> list[Donor]:
+        ...
+
+    def bridge_for_patient(self, patient_id: str) -> tuple[Patient | None, list[Donor]]:
         ...
 
 
@@ -161,6 +182,29 @@ class DynamoRepository:
         item = response.get("Item")
         return _donor_from_item(item) if item else None
 
+    def donors_in_bridge(self, bridge_id: str) -> list[Donor]:
+        # Scan-filter is fine at hackathon scale (~5k donors, 80 bridges).
+        # A GSI on bridge_id is the production move.
+        from boto3.dynamodb.conditions import Attr
+
+        target = _clean_id(bridge_id)
+        items: list[dict] = []
+        scan_kwargs = {"FilterExpression": Attr("bridge_id").eq(target)}
+        while True:
+            response = self.donors_table.scan(**scan_kwargs)
+            items.extend(response.get("Items", []))
+            last_key = response.get("LastEvaluatedKey")
+            if not last_key:
+                break
+            scan_kwargs["ExclusiveStartKey"] = last_key
+        return [_donor_from_item(i) for i in items]
+
+    def bridge_for_patient(self, patient_id: str) -> tuple[Patient | None, list[Donor]]:
+        patient = self.patient(patient_id)
+        if patient is None or not patient.bridge_id:
+            return patient, []
+        return patient, self.donors_in_bridge(patient.bridge_id)
+
 
 def _scan_all(table) -> list[dict]:
     items: list[dict] = []
@@ -187,6 +231,8 @@ def _patient_from_item(item: dict) -> Patient:
         quantity_required=parse_int(item.get("quantity_required")),
         gender=item.get("gender"),
         status=item.get("status"),
+        bridge_id=_clean_id(item.get("bridge_id")) or None,
+        bridge_blood_group=item.get("bridge_blood_group") or None,
     )
 
 
@@ -207,6 +253,9 @@ def _donor_from_item(item: dict) -> Donor:
         calls_to_donations_ratio=parse_float(item.get("calls_to_donations_ratio")),
         active_status=item.get("active_status"),
         inactive_trigger_comment=item.get("inactive_trigger_comment"),
+        bridge_id=_clean_id(item.get("bridge_id")) or None,
+        bridge_blood_group=item.get("bridge_blood_group") or None,
+        last_bridge_donation_date=parse_date(item.get("last_bridge_donation_date")),
     )
 
 

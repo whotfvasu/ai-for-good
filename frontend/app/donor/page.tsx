@@ -1,9 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '@/lib/api'
-import { donorLabel } from '@/lib/labels'
+import { donorLabel, patientLabel } from '@/lib/labels'
+import type { Cycle } from '@/lib/types'
 import { sanitizeSaathiMessage } from '@/lib/sanitize'
+import { sharePlacard } from '@/lib/placard'
+import { useRequireRole } from '@/lib/useRequireRole'
 import type { ConversationTurn, DonorInsight } from '@/lib/types'
 
 const QUICK_NOS = ['Medical', 'Travel', 'Work', 'Fear', 'Tired', 'Trust'] as const
@@ -11,43 +14,24 @@ const POLL_INTERVAL_MS = 4000
 const DEDUPE_WINDOW_MS = 5 * 60 * 1000  // optimistic+polled merge window
 
 export default function DonorPage() {
-  // Real donor id resolved at runtime: ?donor_id=… override, else first
-  // upcoming patient's top-ranked donor. Same DynamoDB row the coordinator
-  // is approving outreach for.
+  const { session, ready } = useRequireRole('donor')
+  // The logged-in donor's id IS the session id. A ?donor_id=… override stays
+  // available for predictable demo pinning.
   const [donorId, setDonorId] = useState<string | null>(null)
   const [turns, setTurns] = useState<ConversationTurn[]>([])
   const [insight, setInsight] = useState<DonorInsight | null>(null)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pendingCycle, setPendingCycle] = useState<Cycle | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // ── 1. Resolve donor id ──────────────────────────────────────────────────
+  // ── 1. Resolve donor id from session (or ?donor_id= override) ────────────
   useEffect(() => {
-    const url = new URL(window.location.href)
-    const overrideId = url.searchParams.get('donor_id')
-    if (overrideId) {
-      setDonorId(overrideId)
-      return
-    }
-    api
-      .forecast({ window: 14, sort: 'date' })
-      .then(forecast => {
-        const firstPatient = forecast.items[0]
-        if (!firstPatient) throw new Error('no upcoming patients in forecast window')
-        return api.rankDonors(firstPatient.patient_id, 1)
-      })
-      .then(rank => {
-        const top = rank.items[0]
-        if (!top) throw new Error('no compatible donor for top patient')
-        setDonorId(top.donor_id)
-      })
-      .catch(err =>
-        setError(
-          `Could not resolve a demo donor (${err.message}). Pin one manually with ?donor_id=<hex>.`
-        )
-      )
-  }, [])
+    if (!ready || !session) return
+    const override = new URL(window.location.href).searchParams.get('donor_id')
+    setDonorId(override || session.id)
+  }, [ready, session])
 
   // ── 2. Fetch opener + insight + initial history ──────────────────────────
   // The chatOpen call generates and persists a fresh opener every time, so we
@@ -118,8 +102,34 @@ export default function DonorPage() {
     }
   }
 
+  // Find this donor's open ask (a cycle they're assigned to, awaiting their yes).
+  const loadPendingCycle = useCallback(async () => {
+    if (!donorId) return
+    try {
+      const res = await api.cycles('auto_running')
+      const mine = res.items.find(c => c.assigned_donor_id === donorId && c.donor_status === 'pending')
+      setPendingCycle(mine ?? null)
+    } catch {
+      /* non-fatal */
+    }
+  }, [donorId])
+
+  useEffect(() => {
+    loadPendingCycle()
+  }, [loadPendingCycle])
+
+  const respond = async (decision: 'yes' | 'no') => {
+    if (!pendingCycle) return
+    await api.confirm(pendingCycle.cycle_id, 'donor', decision)
+    setPendingCycle(null)
+    await loadPendingCycle()
+  }
+
+  if (!ready) return <div className="max-w-4xl mx-auto px-6 py-20 text-center text-marrow-900/40">Loading…</div>
+
   return (
     <div className="max-w-4xl mx-auto px-4 lg:px-6 py-8">
+      {pendingCycle && <ActionBanner cycle={pendingCycle} onRespond={respond} />}
       <ChatCard
         donorId={donorId}
         turns={turns}
@@ -132,6 +142,45 @@ export default function DonorPage() {
         error={error}
       />
       <InsightPill insight={insight} donorId={donorId} />
+      <ShareImpact insight={insight} />
+    </div>
+  )
+}
+
+// Strava-style shareable placard — marketing surface. Generates a PNG client-side.
+function ShareImpact({ insight }: { insight: DonorInsight | null }) {
+  const [busy, setBusy] = useState(false)
+  const lifetime = insight?.lifetime_donations ?? 0
+  const lives = Math.max(1, lifetime)
+  const share = async () => {
+    setBusy(true)
+    try {
+      await sharePlacard({
+        name: insight?.name_used || 'A Marrow donor',
+        livesSustained: lives,
+        lifetimeDonations: lifetime,
+        bloodGroup: 'O Positive',
+        patientName: insight?.patient_bond ? insight.patient_bond.split(' ')[0] : undefined,
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="mt-6 p-6 rounded-4xl bg-gradient-to-br from-marrow-700 to-marrow-900 text-marrow-50 shadow-glow flex items-center justify-between gap-4">
+      <div>
+        <h2 className="font-bold tracking-tightest text-lg">Share your impact</h2>
+        <p className="mt-1 text-sm text-marrow-100/80 max-w-sm">
+          You've sustained {lives} {lives === 1 ? 'life' : 'lives'}. Post your constellation — every share recruits the next donor.
+        </p>
+      </div>
+      <button
+        onClick={share}
+        disabled={busy}
+        className="shrink-0 px-5 py-3 rounded-full bg-marrow-50 text-marrow-900 font-semibold hover:bg-white transition-colors disabled:opacity-60"
+      >
+        {busy ? 'Creating…' : 'Share my card'}
+      </button>
     </div>
   )
 }
@@ -357,4 +406,43 @@ function timeAgo(iso: string): string {
   } catch {
     return ''
   }
+}
+
+// The donor's open ask — the real-world action that arrives on WhatsApp too.
+function ActionBanner({ cycle, onRespond }: { cycle: Cycle; onRespond: (d: 'yes' | 'no') => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  const go = async (d: 'yes' | 'no') => {
+    setBusy(true)
+    try {
+      await onRespond(d)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="mb-4 rounded-3xl bg-marrow-900 text-marrow-50 p-5 shadow-glow">
+      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-marrow-200/70">
+        <span>💬 Also sent to your WhatsApp</span>
+      </div>
+      <p className="mt-2 font-semibold leading-snug">
+        {patientLabel(cycle.patient_id).display} needs {cycle.bridge_blood_group} on {cycle.next_needed_date}. Can you give?
+      </p>
+      <div className="mt-4 flex gap-2">
+        <button
+          onClick={() => go('yes')}
+          disabled={busy}
+          className="px-4 py-2 rounded-full bg-marrow-50 text-marrow-900 text-sm font-semibold hover:bg-white transition-colors disabled:opacity-60"
+        >
+          Yes, I'll donate
+        </button>
+        <button
+          onClick={() => go('no')}
+          disabled={busy}
+          className="px-4 py-2 rounded-full bg-marrow-800 text-marrow-100 text-sm font-semibold hover:bg-marrow-700 transition-colors disabled:opacity-60"
+        >
+          Can't this time
+        </button>
+      </div>
+    </div>
+  )
 }

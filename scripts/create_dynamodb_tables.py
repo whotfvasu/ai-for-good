@@ -28,6 +28,7 @@ def main() -> int:
     parser.add_argument("--conversations-table", default="Conversations")
     parser.add_argument("--refusals-table", default="Refusals")
     parser.add_argument("--donor-insights-table", default="DonorInsights")
+    parser.add_argument("--confirmations-table", default="Confirmations")
     args = parser.parse_args()
 
     import boto3
@@ -87,6 +88,12 @@ def main() -> int:
             args.donor_insights_table,
             [{"AttributeName": "donor_id", "KeyType": "HASH"}],
             [{"AttributeName": "donor_id", "AttributeType": "S"}],
+        ),
+        args.confirmations_table: create_table(
+            dynamodb,
+            args.confirmations_table,
+            [{"AttributeName": "cycle_id", "KeyType": "HASH"}],
+            [{"AttributeName": "cycle_id", "AttributeType": "S"}],
         ),
     }
     print(json.dumps(results, indent=2))

@@ -21,13 +21,17 @@
 
 import { mocks } from './mocks'
 import type {
+  BridgeResponse,
   ConversationTurn,
   ConversationsResponse,
+  Cycle,
+  CyclesResponse,
   DonorInsight,
   ForecastResponse,
   NotifyDonorResponse,
   RankDonorsResponse,
   Refusal,
+  RunSummary,
   SaathiOutreachResponse,
 } from './types'
 
@@ -81,6 +85,49 @@ export const api = {
     const q = new URLSearchParams({ patient_id, limit: String(limit) })
     if (merged.anchor_date) q.set('anchor_date', merged.anchor_date)
     return request<RankDonorsResponse>(`/rank-donors?${q.toString()}`)
+  },
+
+  // Blood Bridge — the patient's dedicated rotating donor pool.
+  bridge: (patient_id: string, anchor_date?: string) => {
+    if (FULL_MOCKS) return Promise.resolve(mocks.bridge(patient_id))
+    const merged = withAnchor({ anchor_date })
+    const q = new URLSearchParams({ patient_id })
+    if (merged.anchor_date) q.set('anchor_date', merged.anchor_date)
+    return request<BridgeResponse>(`/bridge?${q.toString()}`)
+  },
+
+  // ── Autonomous Confirmation Loop ─────────────────────────────────────────
+  runCycles: (window = 14, anchor_date?: string) => {
+    if (FULL_MOCKS) return Promise.resolve(mocks.runCycles())
+    const merged = withAnchor({ anchor_date })
+    return request<RunSummary>('/cycle/run', {
+      method: 'POST',
+      body: JSON.stringify({ window, ...(merged.anchor_date ? { anchor_date: merged.anchor_date } : {}) }),
+    })
+  },
+
+  cycles: (state?: 'auto_running' | 'needs_coordinator' | 'resolved') => {
+    if (FULL_MOCKS) return Promise.resolve(mocks.cycles(state))
+    const q = new URLSearchParams()
+    if (state) q.set('state', state)
+    return request<CyclesResponse>(`/cycles?${q.toString()}`)
+  },
+
+  confirm: (cycle_id: string, party: 'donor' | 'patient', decision: 'yes' | 'no', anchor_date?: string) => {
+    if (FULL_MOCKS) return Promise.resolve(mocks.confirm(cycle_id, party, decision))
+    const merged = withAnchor({ anchor_date })
+    return request<Cycle>('/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ cycle_id, party, decision, ...(merged.anchor_date ? { anchor_date: merged.anchor_date } : {}) }),
+    })
+  },
+
+  assignCycle: (cycle_id: string, donor_id: string) => {
+    if (FULL_MOCKS) return Promise.resolve(mocks.assignCycle(cycle_id, donor_id))
+    return request<Cycle>('/cycle/assign', {
+      method: 'POST',
+      body: JSON.stringify({ cycle_id, donor_id }),
+    })
   },
 
   // L1 — goes live in checkpoint mode

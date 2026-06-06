@@ -5,6 +5,7 @@ from math import asin, cos, radians, sin, sqrt
 
 from .constants import BLOOD_COMPATIBILITY
 from .models import Donor, Patient
+from .pairing import score as pairing_score
 
 
 def blood_group_compatible(donor_group: str, patient_group: str) -> bool:
@@ -56,16 +57,24 @@ def rank_donors(
         # actual dynamic range — not the [0.65, 1.0] squeeze the old formula
         # produced when group_compat was added unweighted and everything was
         # divided by 2.
-        score = (1.0 if eligible else 0.0) * (
+        rule_score = (1.0 if eligible else 0.0) * (
             recency_weight * 0.30
             + responsiveness * 0.40
             + distance_weight * 0.30
         )
 
+        # Blend the learned XGBoost propensity in when the model is available;
+        # fall back to the pure rule score otherwise (demo never breaks).
+        propensity = pairing_score(donor, anchor_date)
+        if propensity is not None and eligible:
+            score = round(0.6 * rule_score + 0.4 * propensity, 3)
+        else:
+            score = round(rule_score, 3)
+
         ranked.append(
             {
                 "donor_id": donor.donor_id,
-                "score": round(score, 3),
+                "score": score,
                 "blood_group": donor.blood_group,
                 "donor_type": donor.donor_type,
                 "factors": {
@@ -75,11 +84,76 @@ def rank_donors(
                     "distance_km": round(distance_km, 2) if distance_km is not None else None,
                     "group_compat": group_compat,
                     "recency_weight": round(recency_weight, 3),
+                    "ml_propensity": round(propensity, 3) if propensity is not None else None,
                 },
             }
         )
 
     return sorted(ranked, key=lambda item: item["score"], reverse=True)[:limit]
+
+
+def rank_bridge_donors(
+    patient: Patient,
+    bridge_donors: list[Donor],
+    anchor_date: date,
+) -> list[dict[str, object]]:
+    """Order a patient's dedicated bridge by *rotation readiness*.
+
+    The Blood Bridge model rotates a fixed pool of ~15 donors so no single
+    donor is over-tapped (90-day eligibility) yet the patient always has
+    coverage. The "next up" donor is the one who is eligible AND has gone
+    longest since their last bridge donation — that's fair rotation. We expose a
+    `rotation_state` so the UI can show who's ready, who's resting, who's the
+    next ask.
+    """
+    rows: list[dict[str, object]] = []
+
+    for donor in bridge_donors:
+        eligible = _eligible(donor, anchor_date)
+        last_bridge = donor.last_bridge_donation_date or donor.last_donation_date
+        days_since_bridge = (anchor_date - last_bridge).days if last_bridge else None
+        responsiveness = _responsiveness(donor)
+
+        # Eligibility already encodes the 90-day recovery window (via
+        # next_eligible_date), so an eligible donor IS ready. We only sub-label
+        # an eligible donor as "recently_donated" if they gave within the last
+        # 30 days (a soft signal to prefer someone fresher first).
+        if not eligible:
+            rotation_state = "resting"
+        elif days_since_bridge is not None and days_since_bridge < 30:
+            rotation_state = "recently_donated"
+        else:
+            rotation_state = "ready"
+
+        # Rotation score: eligible donors who waited longest rank first, with
+        # responsiveness as a tie-breaker, nudged by learned ML propensity.
+        wait_factor = min((days_since_bridge or 0) / 180.0, 1.0)
+        base = 0.75 * wait_factor + 0.25 * responsiveness
+        propensity = pairing_score(donor, anchor_date)
+        if propensity is not None:
+            base = 0.7 * base + 0.3 * propensity
+        score = (1.0 if eligible else 0.0) * base
+
+        rows.append(
+            {
+                "donor_id": donor.donor_id,
+                "blood_group": donor.blood_group,
+                "donor_type": donor.donor_type,
+                "rotation_state": rotation_state,
+                "eligible": eligible,
+                "days_since_last": days_since_bridge,
+                "responsiveness": round(responsiveness, 3),
+                "ml_propensity": round(propensity, 3) if propensity is not None else None,
+                "last_bridge_donation_date": (
+                    donor.last_bridge_donation_date.isoformat() if donor.last_bridge_donation_date else None
+                ),
+                "score": round(score, 3),
+            }
+        )
+
+    # Ready donors first (by score desc), then recently-donated, then resting.
+    order = {"ready": 0, "recently_donated": 1, "resting": 2}
+    return sorted(rows, key=lambda r: (order[r["rotation_state"]], -float(r["score"])))
 
 
 def _eligible(donor: Donor, anchor_date: date) -> bool:

@@ -37,6 +37,8 @@ def patient_item(patient):
         "quantity_required": patient.quantity_required,
         "gender": patient.gender,
         "status": patient.status,
+        "bridge_id": patient.bridge_id,
+        "bridge_blood_group": patient.bridge_blood_group,
     }
     return decimalize(item)
 
@@ -58,6 +60,9 @@ def donor_item(donor):
         "calls_to_donations_ratio": donor.calls_to_donations_ratio,
         "active_status": donor.active_status,
         "inactive_trigger_comment": donor.inactive_trigger_comment,
+        "bridge_id": donor.bridge_id,
+        "bridge_blood_group": donor.bridge_blood_group,
+        "last_bridge_donation_date": donor.last_bridge_donation_date.isoformat() if donor.last_bridge_donation_date else None,
     }
     return decimalize(item)
 

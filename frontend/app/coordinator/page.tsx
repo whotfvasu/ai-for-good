@@ -1,286 +1,294 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { donorLabel, patientLabel } from '@/lib/labels'
-import { sanitizeSaathiMessage } from '@/lib/sanitize'
-import type { ForecastItem, RankedDonor } from '@/lib/types'
+import { useRequireRole } from '@/lib/useRequireRole'
+import type { BridgeDonor, Cycle, CyclesResponse } from '@/lib/types'
 import clsx from 'clsx'
 
 export default function CoordinatorPage() {
-  const [forecast, setForecast] = useState<ForecastItem[]>([])
-  const [activePatient, setActivePatient] = useState<string | null>(null)
-  const [donors, setDonors] = useState<RankedDonor[]>([])
-  const [notifyingDonorId, setNotifyingDonorId] = useState<string | null>(null)
-  const [latestOutreach, setLatestOutreach] = useState<string | null>(null)
-  const [loadingForecast, setLoadingForecast] = useState(true)
-  const [loadingDonors, setLoadingDonors] = useState(false)
-  const [errors, setErrors] = useState<string | null>(null)
+  const { ready } = useRequireRole('coordinator')
+  const [data, setData] = useState<CyclesResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [running, setRunning] = useState(false)
+  const [openCycle, setOpenCycle] = useState<Cycle | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  // The hero metric is computed from the live forecast: how many high-confidence
-  // patients in the window we *could* reassure proactively. Once /family/ack
-  // backs onto Cycles, this swaps to the persisted count.
-  const reassuredThisWeek = useMemo(
-    () => forecast.filter(f => f.confidence === 'high').length,
-    [forecast]
-  )
-
-  useEffect(() => {
-    api
-      .forecast({ window: 7, sort: 'date' })
-      .then(res => {
-        setForecast(res.items)
-        if (res.items[0]) setActivePatient(res.items[0].patient_id)
-      })
-      .catch(e => setErrors(`Forecast failed: ${e.message}. Showing empty state.`))
-      .finally(() => setLoadingForecast(false))
+  const refresh = useCallback(async () => {
+    try {
+      const res = await api.cycles()
+      setData(res)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load cycles')
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
-    if (!activePatient) return
-    setLoadingDonors(true)
-    api
-      .rankDonors(activePatient, 5)
-      .then(res => setDonors(res.items))
-      .catch(e => setErrors(`Donor ranking failed: ${e.message}.`))
-      .finally(() => setLoadingDonors(false))
-  }, [activePatient])
+    if (ready) refresh()
+  }, [ready, refresh])
+
+  if (!ready) return <div className="max-w-7xl mx-auto px-6 py-20 text-center text-marrow-900/40">Loading…</div>
+
+  const counts = data?.counts ?? {}
+  const autoRunning = (data?.items ?? []).filter(c => c.state === 'auto_running')
+  const needsYou = (data?.items ?? []).filter(c => c.state === 'needs_coordinator')
+  const resolved = counts.resolved ?? 0
+  const total = (counts.auto_running ?? 0) + (counts.needs_coordinator ?? 0) + resolved
+  const autonomyPct = total > 0 ? Math.round(((counts.auto_running ?? 0) + resolved) / total * 100) : 0
+
+  const runPass = async () => {
+    setRunning(true)
+    try {
+      await api.runCycles(14)
+      await refresh()
+    } finally {
+      setRunning(false)
+    }
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-6 lg:px-10 py-10">
-      {errors && (
-        <div className="mb-6 p-4 rounded-2xl bg-marrow-100 text-marrow-900 text-sm ring-1 ring-marrow-300">
-          {errors}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tightest text-marrow-900">Coordinator</h1>
+          <p className="mt-1 text-marrow-900/60">
+            The bridge runs itself. You only work the exceptions.
+          </p>
         </div>
+        <button
+          onClick={runPass}
+          disabled={running}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-marrow-900 hover:bg-marrow-800 text-marrow-50 text-sm font-semibold transition-colors disabled:opacity-60"
+        >
+          {running ? 'Running…' : 'Run autonomous pass'}
+          <span aria-hidden>↻</span>
+        </button>
+      </div>
+
+      {error && (
+        <div className="mt-5 p-4 rounded-2xl bg-marrow-100 text-marrow-900 text-sm ring-1 ring-marrow-300">{error}</div>
       )}
 
       {/* Hero strip */}
-      <div className="grid lg:grid-cols-3 gap-5">
-        <HeroMetric
-          big={String(reassuredThisWeek)}
-          label="Families to reassure"
-          sub="High-confidence forecasts in the next 7 days"
-          variant="primary"
-        />
-        <HeroMetric big={String(forecast.length)} label="Patients due in 7 days" sub="From the predictive forecast" />
-        <HeroMetric big="8h 14m" label="Phone time saved" sub="Saathi handles outreach drafts" />
+      <div className="mt-6 grid lg:grid-cols-3 gap-5">
+        <div className="p-6 rounded-4xl bg-marrow-900 text-marrow-50 shadow-glow">
+          <div className="text-5xl font-extrabold tracking-tightest">{counts.auto_running ?? 0}</div>
+          <div className="mt-2 font-semibold text-marrow-100">Running autonomously</div>
+          <div className="mt-1 text-xs text-marrow-200/70">Donor assigned, awaiting confirmation — no human needed</div>
+        </div>
+        <div className={clsx('p-6 rounded-4xl ring-1', (counts.needs_coordinator ?? 0) > 0 ? 'bg-white ring-marrow-300' : 'bg-white ring-marrow-200/60')}>
+          <div className="text-5xl font-extrabold tracking-tightest text-marrow-700">{counts.needs_coordinator ?? 0}</div>
+          <div className="mt-2 font-semibold text-marrow-900">Need you</div>
+          <div className="mt-1 text-xs text-marrow-900/60">Gaps the system couldn't auto-resolve</div>
+        </div>
+        <div className="p-6 rounded-4xl bg-white ring-1 ring-marrow-200/60">
+          <div className="text-5xl font-extrabold tracking-tightest text-marrow-900">{autonomyPct}%</div>
+          <div className="mt-2 font-semibold text-marrow-900">Autonomy rate</div>
+          <div className="mt-1 text-xs text-marrow-900/60">{resolved} resolved · {total} cycles this window</div>
+        </div>
       </div>
 
-      {/* Two-pane */}
-      <div className="mt-8 grid lg:grid-cols-5 gap-5">
-        {/* Upcoming demand */}
-        <section className="lg:col-span-2 bg-white rounded-4xl ring-1 ring-marrow-200/60 overflow-hidden">
-          <header className="px-6 pt-6 pb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold tracking-tightest text-marrow-900">Upcoming demand</h2>
-              <p className="text-xs text-marrow-900/60 mt-0.5">Sorted by next-needed date</p>
-            </div>
-            <span className="pill bg-marrow-100 text-marrow-700">Next 7d</span>
-          </header>
-          <ul className="divide-y divide-marrow-100 max-h-[520px] overflow-y-auto">
-            {loadingForecast && <Skeleton lines={3} />}
-            {!loadingForecast && forecast.length === 0 && <Empty label="No patients due in this window." />}
-            {forecast.map(item => {
-              const label = patientLabel(item.patient_id)
-              return (
-                <li key={item.patient_id}>
-                  <button
-                    onClick={() => setActivePatient(item.patient_id)}
-                    className={clsx(
-                      'w-full text-left px-6 py-4 flex items-center justify-between gap-4 transition-colors',
-                      activePatient === item.patient_id ? 'bg-marrow-50' : 'hover:bg-marrow-50/60'
-                    )}
-                  >
-                    <div className="min-w-0">
-                      <div className="font-semibold text-marrow-900">{label.display}</div>
-                      <div className="text-xs text-marrow-900/60 mt-0.5">
-                        {item.blood_group} · in {item.days_to_needed}d · {item.next_needed_date}
-                      </div>
-                    </div>
-                    <ConfidencePill confidence={item.confidence} worry={item.worry_score} />
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
-
-        {/* Ranked donors */}
-        <section className="lg:col-span-3 bg-white rounded-4xl ring-1 ring-marrow-200/60 overflow-hidden">
-          <header className="px-6 pt-6 pb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold tracking-tightest text-marrow-900">
-                Ranked donors{' '}
-                {activePatient && (
-                  <span className="text-marrow-600">· {patientLabel(activePatient).display}</span>
-                )}
-              </h2>
-              <p className="text-xs text-marrow-900/60 mt-0.5">Score factors in plain English</p>
-            </div>
-            <span className="pill bg-marrow-100 text-marrow-700">Top 5</span>
-          </header>
-          <ul className="divide-y divide-marrow-100">
-            {loadingDonors && <Skeleton lines={3} />}
-            {!loadingDonors && donors.length === 0 && <Empty label="No compatible donors found." />}
-            {!loadingDonors && donors.map(d => (
-              <DonorRow
-                key={d.donor_id}
-                donor={d}
-                notifying={notifyingDonorId === d.donor_id}
-                onApprove={async () => {
-                  if (!activePatient) return
-                  setNotifyingDonorId(d.donor_id)
-                  try {
-                    const result = await api.notifyDonor({
-                      donor_id: d.donor_id,
-                      patient_id: activePatient,
-                      trigger: 'approval',
-                    })
-                    setLatestOutreach(sanitizeSaathiMessage(result.message))
-                  } catch (error) {
-                    const message = error instanceof Error ? error.message : 'Unknown outreach error'
-                    setErrors(`Outreach failed: ${message}.`)
-                  } finally {
-                    setNotifyingDonorId(null)
-                  }
-                }}
-              />
-            ))}
-          </ul>
-          {latestOutreach && (
-            <div className="px-6 py-4 border-t border-marrow-100 bg-marrow-50/60">
-              <div className="text-xs uppercase tracking-[0.12em] text-marrow-700/70">Latest outreach draft</div>
-              <p className="mt-2 text-sm leading-relaxed text-marrow-900">{latestOutreach}</p>
+      {/* Exception queue */}
+      <section className="mt-8">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold tracking-tightest text-marrow-900">Needs you</h2>
+          <span className="pill bg-marrow-100 text-marrow-700">{needsYou.length} exceptions</span>
+        </div>
+        <div className="mt-4 grid md:grid-cols-2 gap-4">
+          {loading && Array.from({ length: 2 }).map((_, i) => <div key={i} className="h-32 rounded-3xl bg-marrow-50 animate-pulse" />)}
+          {!loading && needsYou.length === 0 && (
+            <div className="md:col-span-2 p-8 rounded-3xl bg-marrow-50/60 ring-1 ring-marrow-100 text-center">
+              <div className="text-2xl">🎉</div>
+              <p className="mt-2 font-semibold text-marrow-900">Inbox zero.</p>
+              <p className="text-sm text-marrow-900/60">Every upcoming cycle is covered automatically. Nothing needs you right now.</p>
             </div>
           )}
-        </section>
-      </div>
+          {needsYou.map(c => (
+            <ExceptionCard key={c.cycle_id} cycle={c} onOpen={() => setOpenCycle(c)} />
+          ))}
+        </div>
+      </section>
+
+      {/* Autonomous list */}
+      <section className="mt-10">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold tracking-tightest text-marrow-900">Running autonomously</h2>
+          <span className="pill bg-marrow-100 text-marrow-700">{autoRunning.length} cycles</span>
+        </div>
+        <div className="mt-4 bg-white rounded-4xl ring-1 ring-marrow-200/60 overflow-hidden">
+          <ul className="divide-y divide-marrow-100 max-h-[420px] overflow-y-auto">
+            {autoRunning.map(c => (
+              <AutoRow key={c.cycle_id} cycle={c} onChange={refresh} />
+            ))}
+            {!loading && autoRunning.length === 0 && (
+              <li className="px-6 py-10 text-center text-sm text-marrow-900/60">
+                No cycles running yet. Hit “Run autonomous pass”.
+              </li>
+            )}
+          </ul>
+        </div>
+      </section>
+
+      {openCycle && <ExceptionDrawer cycle={openCycle} onClose={() => setOpenCycle(null)} onResolved={refresh} />}
     </div>
   )
 }
 
-function HeroMetric({
-  big,
-  label,
-  sub,
-  variant,
-}: {
-  big: string
-  label: string
-  sub: string
-  variant?: 'primary'
-}) {
+function ExceptionCard({ cycle, onOpen }: { cycle: Cycle; onOpen: () => void }) {
   return (
-    <div
-      className={clsx(
-        'p-6 rounded-4xl',
-        variant === 'primary'
-          ? 'bg-marrow-900 text-marrow-50 shadow-glow'
-          : 'bg-white ring-1 ring-marrow-200/60'
-      )}
+    <button
+      onClick={onOpen}
+      className="text-left p-5 rounded-3xl bg-white ring-1 ring-marrow-300 hover:shadow-soft hover:-translate-y-0.5 transition-all"
     >
-      <div className={clsx('text-5xl font-extrabold tracking-tightest', variant && 'text-marrow-50')}>{big}</div>
-      <div className={clsx('mt-2 font-semibold', variant ? 'text-marrow-100' : 'text-marrow-900')}>{label}</div>
-      <div className={clsx('mt-1 text-xs', variant ? 'text-marrow-200/70' : 'text-marrow-900/60')}>{sub}</div>
-    </div>
+      <div className="flex items-center justify-between">
+        <div className="font-semibold text-marrow-900">{patientLabel(cycle.patient_id).display}</div>
+        <span className="pill bg-marrow-100 text-marrow-700">{cycle.bridge_blood_group}</span>
+      </div>
+      <div className="mt-1 text-xs text-marrow-900/60">needs blood on {cycle.next_needed_date}</div>
+      <p className="mt-3 text-sm text-marrow-900/70">{cycle.note}</p>
+      <div className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-marrow-700">
+        Resolve <span aria-hidden>→</span>
+      </div>
+    </button>
   )
 }
 
-function DonorRow({
-  donor,
-  notifying,
-  onApprove,
-}: {
-  donor: RankedDonor
-  notifying: boolean
-  onApprove: () => Promise<void>
-}) {
-  const f = donor.factors
+function AutoRow({ cycle, onChange }: { cycle: Cycle; onChange: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const act = async (party: 'donor' | 'patient', decision: 'yes' | 'no') => {
+    setBusy(true)
+    try {
+      await api.confirm(cycle.cycle_id, party, decision)
+      await onChange()
+    } finally {
+      setBusy(false)
+    }
+  }
   return (
     <li className="px-6 py-4 flex items-center justify-between gap-4">
       <div className="min-w-0">
-        <div className="font-semibold text-marrow-900">{donorLabel(donor.donor_id)}</div>
+        <div className="font-semibold text-marrow-900">
+          {patientLabel(cycle.patient_id).display}
+          <span className="text-marrow-900/50 font-normal"> · {cycle.next_needed_date}</span>
+        </div>
         <div className="text-xs text-marrow-900/60 mt-0.5">
-          {f.eligible ? '✓ eligible' : '✕ not eligible'}
-          {' · '}
-          {Math.round(f.responsiveness * 100)}% responsive
-          {' · '}
-          {/* Dataset reality: every CSV row shares the same default lat/lng,
-             so haversine returns 0. We treat exact-zero as unknown instead of
-             pretending the donor lives in the patient's bed. */}
-          {f.distance_km === null || f.distance_km === 0
-            ? 'distance unknown'
-            : `${f.distance_km.toFixed(1)} km`}
-          {' · '}
-          last {f.days_since_last ?? '–'}d ago
+          {cycle.assigned_donor_id ? `→ ${donorLabel(cycle.assigned_donor_id)}` : 'unassigned'} ·
+          donor {cycle.donor_status} · patient {cycle.patient_status}
         </div>
       </div>
-      <div className="flex items-center gap-3">
-        <ScoreRing score={donor.score} />
+      <div className="flex items-center gap-2">
+        <StatusDot status={cycle.donor_status} />
+        {/* Demo controls to simulate confirmations landing */}
         <button
-          onClick={onApprove}
-          disabled={notifying}
-          className="px-3.5 py-2 rounded-full bg-marrow-900 hover:bg-marrow-800 text-white text-xs font-semibold transition-colors disabled:opacity-60"
+          onClick={() => act('donor', 'yes')}
+          disabled={busy || cycle.donor_status === 'confirmed'}
+          className="px-2.5 py-1 rounded-full text-xs font-medium bg-marrow-50 ring-1 ring-marrow-200/60 hover:bg-marrow-100 text-marrow-800 disabled:opacity-40"
         >
-          {notifying ? 'Drafting...' : 'Approve outreach'}
+          donor ✓
+        </button>
+        <button
+          onClick={() => act('patient', 'yes')}
+          disabled={busy || cycle.patient_status === 'confirmed'}
+          className="px-2.5 py-1 rounded-full text-xs font-medium bg-marrow-50 ring-1 ring-marrow-200/60 hover:bg-marrow-100 text-marrow-800 disabled:opacity-40"
+        >
+          patient ✓
         </button>
       </div>
     </li>
   )
 }
 
-function ScoreRing({ score }: { score: number }) {
-  const pct = Math.max(0, Math.min(1, score))
-  const circumference = 2 * Math.PI * 18
+function StatusDot({ status }: { status: string }) {
+  const c = status === 'confirmed' ? 'bg-green-500' : status === 'declined' ? 'bg-red-500' : 'bg-amber-400'
+  return <span className={clsx('w-2 h-2 rounded-full', c)} />
+}
+
+// Drill-in: pull the patient's bridge, let the coordinator assign a donor.
+function ExceptionDrawer({ cycle, onClose, onResolved }: { cycle: Cycle; onClose: () => void; onResolved: () => void }) {
+  const [donors, setDonors] = useState<BridgeDonor[]>([])
+  const [importance, setImportance] = useState<Record<string, number>>({})
+  const [loading, setLoading] = useState(true)
+  const [assigning, setAssigning] = useState<string | null>(null)
+
+  useEffect(() => {
+    api
+      .bridge(cycle.patient_id)
+      .then(b => {
+        setDonors(b.donors)
+        setImportance(b.ml_importance ?? {})
+      })
+      .finally(() => setLoading(false))
+  }, [cycle.patient_id])
+
+  const assign = async (donorId: string) => {
+    setAssigning(donorId)
+    try {
+      await api.assignCycle(cycle.cycle_id, donorId)
+      await onResolved()
+      onClose()
+    } finally {
+      setAssigning(null)
+    }
+  }
+
   return (
-    <div className="relative w-12 h-12">
-      <svg className="w-12 h-12 -rotate-90" viewBox="0 0 44 44">
-        <circle cx="22" cy="22" r="18" fill="none" stroke="#FCD2D2" strokeWidth="4" />
-        <circle
-          cx="22"
-          cy="22"
-          r="18"
-          fill="none"
-          stroke="#BB2B29"
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={circumference * (1 - pct)}
-        />
-      </svg>
-      <div className="absolute inset-0 grid place-items-center text-[11px] font-bold text-marrow-900">
-        {Math.round(pct * 100)}
+    <div className="fixed inset-0 z-50 flex justify-end bg-ink/30 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="w-full max-w-md h-full bg-paper shadow-glow overflow-y-auto animate-fade-in"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="p-6 border-b border-marrow-100 flex items-center justify-between">
+          <div>
+            <h3 className="font-bold tracking-tightest text-marrow-900">{patientLabel(cycle.patient_id).display}</h3>
+            <p className="text-xs text-marrow-900/60">needs {cycle.bridge_blood_group} on {cycle.next_needed_date}</p>
+          </div>
+          <button onClick={onClose} className="text-marrow-900/50 hover:text-marrow-900 text-xl">×</button>
+        </div>
+        <div className="p-6">
+          <p className="text-sm text-marrow-900/70">{cycle.note}</p>
+          <h4 className="mt-6 text-xs uppercase tracking-[0.15em] text-marrow-700/70">Their bridge — assign a donor</h4>
+          <div className="mt-3 space-y-2">
+            {loading && Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-16 rounded-2xl bg-marrow-50 animate-pulse" />)}
+            {!loading && donors.map(d => (
+              <div key={d.donor_id} className="p-3 rounded-2xl bg-white ring-1 ring-marrow-200/60 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-semibold text-sm text-marrow-900">{donorLabel(d.donor_id)}</div>
+                  <div className="text-xs text-marrow-900/60">
+                    {d.rotation_state.replace('_', ' ')} · last {d.days_since_last ?? '–'}d ago
+                    {d.ml_propensity != null && ` · ${Math.round(d.ml_propensity * 100)}% likely`}
+                  </div>
+                </div>
+                <button
+                  onClick={() => assign(d.donor_id)}
+                  disabled={assigning !== null}
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold bg-marrow-900 hover:bg-marrow-800 text-white disabled:opacity-50"
+                >
+                  {assigning === d.donor_id ? '…' : 'Assign'}
+                </button>
+              </div>
+            ))}
+            {!loading && donors.length === 0 && (
+              <p className="text-sm text-marrow-900/60">This bridge has no donors — widen to compatible donors nearby (roadmap).</p>
+            )}
+          </div>
+
+          {Object.keys(importance).length > 0 && (
+            <div className="mt-6 p-4 rounded-2xl bg-marrow-50/60 ring-1 ring-marrow-100">
+              <div className="text-[10px] uppercase tracking-[0.15em] text-marrow-700/70">
+                What the model weighs (XGBoost)
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {Object.keys(importance).map(k => (
+                  <span key={k} className="pill bg-marrow-100 text-marrow-700">{k.replace(/_/g, ' ')}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
-}
-
-function ConfidencePill({ confidence, worry }: { confidence: string; worry: number }) {
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <span
-        className={clsx(
-          'pill',
-          confidence === 'high' ? 'bg-marrow-100 text-marrow-700' : 'bg-marrow-50 text-marrow-700/70'
-        )}
-      >
-        {confidence}
-      </span>
-      <span className="text-[10px] text-marrow-900/60">worry {worry.toFixed(2)}</span>
-    </div>
-  )
-}
-
-function Skeleton({ lines }: { lines: number }) {
-  return (
-    <li className="px-6 py-4 space-y-3">
-      {Array.from({ length: lines }).map((_, i) => (
-        <div key={i} className="h-12 rounded-2xl bg-marrow-50 animate-pulse" />
-      ))}
-    </li>
-  )
-}
-
-function Empty({ label }: { label: string }) {
-  return <li className="px-6 py-10 text-center text-sm text-marrow-900/60">{label}</li>
 }

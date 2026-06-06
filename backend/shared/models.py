@@ -16,6 +16,9 @@ class Patient:
     quantity_required: int | None
     gender: str | None
     status: str | None
+    # Blood Bridge — the dedicated rotating donor pool that sustains this patient.
+    bridge_id: str | None = None
+    bridge_blood_group: str | None = None
 
 
 @dataclass(frozen=True)
@@ -35,3 +38,7 @@ class Donor:
     calls_to_donations_ratio: float | None
     active_status: str | None
     inactive_trigger_comment: str | None
+    # Blood Bridge membership — which patient's bridge this donor belongs to.
+    bridge_id: str | None = None
+    bridge_blood_group: str | None = None
+    last_bridge_donation_date: date | None = None

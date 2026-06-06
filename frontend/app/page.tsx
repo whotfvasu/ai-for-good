@@ -28,17 +28,17 @@ export default function Home() {
 
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <Link
-              href="/coordinator"
+              href="/login"
               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-marrow-600 hover:bg-marrow-700 text-white font-semibold shadow-glow transition-all"
             >
-              Open coordinator view
+              Sign in to Marrow
               <span aria-hidden>→</span>
             </Link>
             <Link
-              href="/donor"
+              href="/login"
               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-white hover:bg-marrow-50 text-marrow-900 font-semibold ring-1 ring-marrow-200/70 transition-all"
             >
-              Try the Saathi chat
+              Explore the three roles
             </Link>
           </div>
 
@@ -66,21 +66,21 @@ export default function Home() {
 
         <div className="mt-10 grid md:grid-cols-3 gap-5">
           <ValueCard
-            tag="Family"
-            href="/family"
-            title="Reassure before they ask"
-            body="The forecast triggers a calm message to the parent first. Anxiety reduced becomes our hero metric."
+            tag="Patient"
+            href="/login"
+            title="Your bridge, always ready"
+            body="A dedicated pool of donors rotates to sustain you. See your next tentative date before you have to ask."
           />
           <ValueCard
             tag="Coordinator"
-            href="/coordinator"
-            title="Co-pilot, not console"
-            body="Saathi suggests, the coordinator approves. We track hours of phone time saved this week."
+            href="/login"
+            title="Handle exceptions, not everything"
+            body="The bridge runs itself. You only see the cycles that actually need a human. Country-scale by design."
             highlighted
           />
           <ValueCard
             tag="Donor"
-            href="/donor"
+            href="/login"
             title="Refusal is information"
             body="Every “no” captures a reason. We come back when fever is gone, never sooner. Trust, renewed."
           />

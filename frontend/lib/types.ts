@@ -28,6 +28,7 @@ export interface RankedDonorFactors {
   distance_km: number | null
   group_compat: number
   recency_weight: number
+  ml_propensity?: number | null
 }
 
 export interface RankedDonor {
@@ -100,4 +101,57 @@ export interface DonorInsight {
 export interface ConversationsResponse {
   donor_id: string
   items: ConversationTurn[]
+}
+
+export type RotationState = 'ready' | 'recently_donated' | 'resting'
+
+export interface BridgeDonor {
+  donor_id: string
+  blood_group: string
+  donor_type: string | null
+  rotation_state: RotationState
+  eligible: boolean
+  days_since_last: number | null
+  responsiveness: number
+  ml_propensity?: number | null
+  last_bridge_donation_date: string | null
+  score: number
+}
+
+export interface BridgeResponse {
+  patient_id: string
+  bridge_id: string | null
+  bridge_blood_group: string
+  next_needed_date: string | null
+  pool_size: number
+  ready_count: number
+  donors: BridgeDonor[]
+  ml_importance?: Record<string, number>
+}
+
+export type CycleState = 'auto_running' | 'needs_coordinator' | 'resolved'
+
+export interface Cycle {
+  cycle_id: string
+  patient_id: string
+  bridge_id: string | null
+  bridge_blood_group: string
+  assigned_donor_id: string | null
+  next_needed_date: string
+  donor_status: 'pending' | 'confirmed' | 'declined'
+  patient_status: 'pending' | 'confirmed'
+  state: CycleState
+  note: string
+  updated_at: string
+}
+
+export interface CyclesResponse {
+  items: Cycle[]
+  counts: Partial<Record<CycleState, number>>
+}
+
+export interface RunSummary {
+  anchor_date: string
+  window: number
+  summary: { created: number; auto_running: number; needs_coordinator: number; resolved: number; skipped: number }
 }
