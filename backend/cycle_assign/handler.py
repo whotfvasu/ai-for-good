@@ -27,5 +27,9 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     row["assigned_donor_id"] = donor_id
     row["donor_status"] = "pending"
     row["state"] = "auto_running"
-    row["note"] = "Coordinator manually assigned a donor. Awaiting confirmation."
+    row["note"] = "Coordinator manually assigned a donor. Ready for WhatsApp send."
+    row.pop("donor_notified_at", None)
+    row.pop("last_notified_donor_id", None)
+    row.pop("last_message_text", None)
+    row.pop("whatsapp_status", None)
     return response(200, store.put(row))

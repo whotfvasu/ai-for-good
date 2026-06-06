@@ -165,39 +165,37 @@ class DynamoRepository:
         self.donors_table = dynamodb.Table(
             donors_table_name or os.environ.get(DONORS_TABLE_ENV, DEFAULT_DONORS_TABLE)
         )
+        self._patients_cache: list[Patient] | None = None
+        self._donors_cache: list[Donor] | None = None
+        self._donors_by_bridge_cache: dict[str, list[Donor]] | None = None
 
     def patients(self) -> list[Patient]:
-        return [_patient_from_item(item) for item in _scan_all(self.patients_table)]
+        if self._patients_cache is None:
+            self._patients_cache = [_patient_from_item(item) for item in _scan_all(self.patients_table)]
+        return self._patients_cache
 
     def donors(self) -> list[Donor]:
-        return [_donor_from_item(item) for item in _scan_all(self.donors_table)]
+        if self._donors_cache is None:
+            self._donors_cache = [_donor_from_item(item) for item in _scan_all(self.donors_table)]
+        return self._donors_cache
 
     def patient(self, patient_id: str) -> Patient | None:
-        response = self.patients_table.get_item(Key={"patient_id": _clean_id(patient_id)})
-        item = response.get("Item")
-        return _patient_from_item(item) if item else None
+        normalized_id = _clean_id(patient_id)
+        return next((patient for patient in self.patients() if patient.patient_id == normalized_id), None)
 
     def donor(self, donor_id: str) -> Donor | None:
-        response = self.donors_table.get_item(Key={"donor_id": _clean_id(donor_id)})
-        item = response.get("Item")
-        return _donor_from_item(item) if item else None
+        normalized_id = _clean_id(donor_id)
+        return next((donor for donor in self.donors() if donor.donor_id == normalized_id), None)
 
     def donors_in_bridge(self, bridge_id: str) -> list[Donor]:
-        # Scan-filter is fine at hackathon scale (~5k donors, 80 bridges).
-        # A GSI on bridge_id is the production move.
-        from boto3.dynamodb.conditions import Attr
-
         target = _clean_id(bridge_id)
-        items: list[dict] = []
-        scan_kwargs = {"FilterExpression": Attr("bridge_id").eq(target)}
-        while True:
-            response = self.donors_table.scan(**scan_kwargs)
-            items.extend(response.get("Items", []))
-            last_key = response.get("LastEvaluatedKey")
-            if not last_key:
-                break
-            scan_kwargs["ExclusiveStartKey"] = last_key
-        return [_donor_from_item(i) for i in items]
+        if self._donors_by_bridge_cache is None:
+            index: dict[str, list[Donor]] = {}
+            for donor in self.donors():
+                if donor.bridge_id:
+                    index.setdefault(donor.bridge_id, []).append(donor)
+            self._donors_by_bridge_cache = index
+        return self._donors_by_bridge_cache.get(target, [])
 
     def bridge_for_patient(self, patient_id: str) -> tuple[Patient | None, list[Donor]]:
         patient = self.patient(patient_id)

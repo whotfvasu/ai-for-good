@@ -7,11 +7,11 @@
 
 ## TL;DR
 
-`vasu` now contains a complete, deployable system: auth, Blood Bridge, an
+`main` now contains a complete, deployable system: auth, Blood Bridge, an
 Autonomous Confirmation Loop, Twilio WhatsApp, a shareable placard, and an
 XGBoost pairing model served in pure Python. **Do not re-implement any of the
 files listed under "Owned / done" below.** If you want to extend them, pull
-`vasu` first and branch from it.
+`main` first, then fast-forward/push `vasu` so Amplify redeploys the frontend.
 
 ## Merge guidance
 

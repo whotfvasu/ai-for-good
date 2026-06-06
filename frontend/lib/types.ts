@@ -1,7 +1,7 @@
 // Types mirror the schemas in openapi.yaml at the repo root.
 // One source of truth for both backend and frontend.
 
-export type Role = 'coordinator' | 'donor' | 'family'
+export type Role = 'coordinator' | 'donor' | 'patient'
 
 export interface ForecastItem {
   patient_id: string
@@ -76,6 +76,7 @@ export interface NotifyDonorResponse {
   usage?: { input_tokens: number; output_tokens: number }
   channel: string
   language: string
+  whatsapp?: { sent: boolean; reason?: string; status?: string; sid?: string }
 }
 
 // The cold-memory record — produced by the distill_insight Lambda from up to
@@ -143,6 +144,10 @@ export interface Cycle {
   state: CycleState
   note: string
   updated_at: string
+  donor_notified_at?: string
+  last_notified_donor_id?: string
+  last_message_text?: string
+  whatsapp_status?: { sent: boolean; reason?: string; status?: string; sid?: string }
 }
 
 export interface CyclesResponse {
@@ -153,5 +158,14 @@ export interface CyclesResponse {
 export interface RunSummary {
   anchor_date: string
   window: number
-  summary: { created: number; auto_running: number; needs_coordinator: number; resolved: number; skipped: number }
+  max_cycles?: number | null
+  summary: {
+    created: number
+    auto_running: number
+    needs_coordinator: number
+    resolved: number
+    skipped: number
+    processed?: number
+    limited?: boolean
+  }
 }

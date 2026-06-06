@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -11,17 +11,30 @@ from .constants import (
     DEFAULT_CONVERSATIONS_TABLE,
     DEFAULT_DISTILL_FUNCTION,
     DEFAULT_INSIGHTS_TABLE,
+    DEFAULT_REFUSALS_TABLE,
     DISTILL_FUNCTION_ENV,
     INSIGHT_ALLOWED_CHANNELS,
     INSIGHT_ALLOWED_ENGAGEMENT_STATES,
     INSIGHT_ALLOWED_LANGUAGES,
     INSIGHT_ALLOWED_TIME_WINDOWS,
     INSIGHTS_TABLE_ENV,
+    REFUSAL_EXPIRY_DAYS,
+    REFUSALS_TABLE_ENV,
+    REPOSITORY_MODE_ENV,
 )
+
+
+_CONVERSATION_ROWS: list[dict[str, Any]] = []
+_INSIGHT_ROWS: dict[str, dict[str, Any]] = {}
+_REFUSAL_ROWS: list[dict[str, Any]] = []
 
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _use_dynamo() -> bool:
+    return os.environ.get(REPOSITORY_MODE_ENV, "csv").lower() == "dynamodb"
 
 
 def conversation_table():
@@ -40,7 +53,20 @@ def insights_table():
     )
 
 
+def refusals_table():
+    import boto3
+
+    return boto3.resource("dynamodb").Table(
+        os.environ.get(REFUSALS_TABLE_ENV, DEFAULT_REFUSALS_TABLE)
+    )
+
+
 def get_conversations(donor_id: str, limit: int = 20, descending: bool = False) -> list[dict[str, Any]]:
+    if not _use_dynamo():
+        rows = [row for row in _CONVERSATION_ROWS if row.get("donor_id") == donor_id]
+        rows.sort(key=lambda row: row.get("ts", ""), reverse=descending)
+        return [_normalize_item(row) for row in rows[:limit]]
+
     from boto3.dynamodb.conditions import Key
 
     response = conversation_table().query(
@@ -72,11 +98,18 @@ def append_conversation_turn(
     if meta:
         turn["meta"] = _decimalize(meta)
 
-    conversation_table().put_item(Item=_decimalize(turn))
+    if _use_dynamo():
+        conversation_table().put_item(Item=_decimalize(turn))
+    else:
+        _CONVERSATION_ROWS.append(_normalize_item(turn))
     return _normalize_item(turn)
 
 
 def get_donor_insight(donor_id: str) -> dict[str, Any] | None:
+    if not _use_dynamo():
+        item = _INSIGHT_ROWS.get(donor_id)
+        return _normalize_item(item) if item else None
+
     response = insights_table().get_item(Key={"donor_id": donor_id})
     item = response.get("Item")
     return _normalize_item(item) if item else None
@@ -84,8 +117,46 @@ def get_donor_insight(donor_id: str) -> dict[str, Any] | None:
 
 def put_donor_insight(insight: dict[str, Any]) -> dict[str, Any]:
     normalized = _normalize_item(insight)
-    insights_table().put_item(Item=_decimalize(normalized))
+    if _use_dynamo():
+        insights_table().put_item(Item=_decimalize(normalized))
+    else:
+        _INSIGHT_ROWS[normalized["donor_id"]] = normalized
     return normalized
+
+
+def record_refusal(
+    donor_id: str,
+    reason_bucket: str | None = None,
+    text: str | None = None,
+    *,
+    anchor_date: date | None = None,
+    base_insight: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    bucket = reason_bucket if reason_bucket in REFUSAL_EXPIRY_DAYS else "tired"
+    now_date = anchor_date or datetime.now(timezone.utc).date()
+    expiry_days = REFUSAL_EXPIRY_DAYS[bucket]
+    expires_at = (now_date + timedelta(days=expiry_days)).isoformat() if expiry_days is not None else None
+    row = {
+        "donor_id": donor_id,
+        "ts": utc_now_iso(),
+        "reason_bucket": bucket,
+        "text": text or "",
+        "expires_at": expires_at,
+    }
+
+    if _use_dynamo():
+        refusals_table().put_item(Item=_decimalize(row))
+    else:
+        _REFUSAL_ROWS.append(_normalize_item(row))
+
+    insight = base_insight or get_donor_insight(donor_id)
+    if insight:
+        insight["last_refusal_reason"] = bucket
+        insight["last_refusal_expires_at"] = expires_at
+        insight["updated_at"] = utc_now_iso()
+        put_donor_insight(insight)
+
+    return _normalize_item(row)
 
 
 def default_insight(donor: Any) -> dict[str, Any]:

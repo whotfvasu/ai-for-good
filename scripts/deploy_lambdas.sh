@@ -134,6 +134,7 @@ LAMBDAS=(
   "marrow-rank-donors|backend.rank_donors.handler.lambda_handler"
   "marrow-family-ack|backend.family_ack.handler.lambda_handler"
   "marrow-notify-donor|backend.notify_donor.handler.lambda_handler"
+  "marrow-refusals|backend.refusals.handler.lambda_handler"
   "marrow-distill-insight|backend.distill_insight.handler.lambda_handler"
   "marrow-saathi-chat|backend.saathi_chat.handler.lambda_handler"
   "marrow-bridge|backend.bridge.handler.lambda_handler"
@@ -141,6 +142,7 @@ LAMBDAS=(
   "marrow-confirm|backend.confirm.handler.lambda_handler"
   "marrow-cycles|backend.cycles.handler.lambda_handler"
   "marrow-cycle-assign|backend.cycle_assign.handler.lambda_handler"
+  "marrow-cycle-notify|backend.cycle_notify.handler.lambda_handler"
 )
 
 # Shared env vars — flips repository.py from CsvRepository to DynamoRepository.
@@ -154,6 +156,7 @@ ENV_JSON=$(cat <<JSON
   "MARROW_DONORS_TABLE":"Donors",
   "MARROW_INSIGHTS_TABLE":"DonorInsights",
   "MARROW_CONVERSATIONS_TABLE":"Conversations",
+  "MARROW_REFUSALS_TABLE":"Refusals",
   "MARROW_CONFIRMATIONS_TABLE":"Confirmations",
   "MARROW_DISTILL_INSIGHT_FUNCTION":"marrow-distill-insight",
   "TWILIO_SID":"${TWILIO_SID:-}",

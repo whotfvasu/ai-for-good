@@ -50,9 +50,9 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         next_eligible_date=donor.next_eligible_date.isoformat() if donor.next_eligible_date else None,
         anchor_date=anchor_date,
     )
-    # A manual coordinator "approval" overrides WAIT, but never a SKIP
+    # A manual coordinator "approval" overrides WAIT, but never SKIP
     # (trust/fear must stay human). Autonomous triggers respect the policy.
-    if decision.action == "SKIP":
+    if decision.action != CONTACT and trigger != "approval":
         return response(
             200,
             {

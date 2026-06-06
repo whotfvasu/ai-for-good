@@ -10,6 +10,10 @@ from backend.shared.http import json_body, query_params, response
 from backend.shared.repository import get_repository
 
 
+def _is_http_request(event: dict[str, Any]) -> bool:
+    return bool(event.get("requestContext") or event.get("httpMethod") or event.get("rawPath"))
+
+
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """Runs the autonomous loop one pass.
 
@@ -19,6 +23,15 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     params = {**json_body(event), **query_params(event)}
     anchor_date = parse_date(params.get("anchor_date")) or date.today()
     window = parse_int(params.get("window"), 14) or 14
+    max_cycles = parse_int(params.get("max_cycles"), 12) if _is_http_request(event) else parse_int(params.get("max_cycles"))
 
-    summary = run_cycles(get_repository(), get_store(), anchor_date, window)
-    return response(200, {"anchor_date": anchor_date.isoformat(), "window": window, "summary": summary})
+    summary = run_cycles(get_repository(), get_store(), anchor_date, window, max_cycles=max_cycles)
+    return response(
+        200,
+        {
+            "anchor_date": anchor_date.isoformat(),
+            "window": window,
+            "max_cycles": max_cycles,
+            "summary": summary,
+        },
+    )

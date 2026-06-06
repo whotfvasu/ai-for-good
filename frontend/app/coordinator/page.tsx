@@ -158,6 +158,7 @@ function ExceptionCard({ cycle, onOpen }: { cycle: Cycle; onOpen: () => void }) 
 
 function AutoRow({ cycle, onChange }: { cycle: Cycle; onChange: () => void }) {
   const [busy, setBusy] = useState(false)
+  const [sending, setSending] = useState(false)
   const act = async (party: 'donor' | 'patient', decision: 'yes' | 'no') => {
     setBusy(true)
     try {
@@ -167,6 +168,16 @@ function AutoRow({ cycle, onChange }: { cycle: Cycle; onChange: () => void }) {
       setBusy(false)
     }
   }
+  const sendWhatsApp = async () => {
+    setSending(true)
+    try {
+      await api.notifyCycle(cycle.cycle_id)
+      await onChange()
+    } finally {
+      setSending(false)
+    }
+  }
+  const canSend = Boolean(cycle.assigned_donor_id && cycle.donor_status === 'pending')
   return (
     <li className="px-6 py-4 flex items-center justify-between gap-4">
       <div className="min-w-0">
@@ -177,10 +188,18 @@ function AutoRow({ cycle, onChange }: { cycle: Cycle; onChange: () => void }) {
         <div className="text-xs text-marrow-900/60 mt-0.5">
           {cycle.assigned_donor_id ? `→ ${donorLabel(cycle.assigned_donor_id)}` : 'unassigned'} ·
           donor {cycle.donor_status} · patient {cycle.patient_status}
+          {cycle.whatsapp_status && ` · WhatsApp ${cycle.whatsapp_status.sent ? cycle.whatsapp_status.status ?? 'sent' : cycle.whatsapp_status.reason ?? 'skipped'}`}
         </div>
       </div>
       <div className="flex items-center gap-2">
         <StatusDot status={cycle.donor_status} />
+        <button
+          onClick={sendWhatsApp}
+          disabled={!canSend || sending || Boolean(cycle.donor_notified_at)}
+          className="px-2.5 py-1 rounded-full text-xs font-medium bg-marrow-900 text-marrow-50 hover:bg-marrow-800 disabled:opacity-40"
+        >
+          {cycle.donor_notified_at ? 'sent' : sending ? 'sending...' : 'send WhatsApp'}
+        </button>
         {/* Demo controls to simulate confirmations landing */}
         <button
           onClick={() => act('donor', 'yes')}

@@ -14,8 +14,15 @@ sys.path.insert(0, str(ROOT))
 from backend.family_ack.handler import lambda_handler as family_ack_handler
 from backend.forecast.handler import lambda_handler as forecast_handler
 from backend.health.handler import lambda_handler as health_handler
+from backend.bridge.handler import lambda_handler as bridge_handler
+from backend.confirm.handler import lambda_handler as confirm_handler
+from backend.cycle_assign.handler import lambda_handler as cycle_assign_handler
+from backend.cycle_notify.handler import lambda_handler as cycle_notify_handler
+from backend.cycle_runner.handler import lambda_handler as cycle_runner_handler
+from backend.cycles.handler import lambda_handler as cycles_handler
 from backend.notify_donor.handler import lambda_handler as notify_donor_handler
 from backend.rank_donors.handler import lambda_handler as rank_donors_handler
+from backend.refusals.handler import lambda_handler as refusals_handler
 from backend.saathi_chat.handler import lambda_handler as saathi_chat_handler
 
 
@@ -52,6 +59,14 @@ class LocalApiHandler(BaseHTTPRequestHandler):
             self.write_lambda_response(rank_donors_handler(make_event(query), None))
             return
 
+        if parsed.path == "/bridge":
+            self.write_lambda_response(bridge_handler(make_event(query), None))
+            return
+
+        if parsed.path == "/cycles":
+            self.write_lambda_response(cycles_handler(make_event(query), None))
+            return
+
         if parsed.path in {"/saathi/chat/open", "/conversations"} or (
             parsed.path.startswith("/donor/") and parsed.path.endswith("/insight")
         ):
@@ -75,6 +90,31 @@ class LocalApiHandler(BaseHTTPRequestHandler):
         if parsed.path == "/notify/donor":
             event = make_event(body=body)
             self.write_lambda_response(notify_donor_handler(event, None))
+            return
+
+        if parsed.path == "/refusals":
+            event = make_event(body=body)
+            self.write_lambda_response(refusals_handler(event, None))
+            return
+
+        if parsed.path == "/cycle/run":
+            event = make_event(parse_qs(parsed.query), body)
+            self.write_lambda_response(cycle_runner_handler(event, None))
+            return
+
+        if parsed.path == "/confirm":
+            event = make_event(body=body)
+            self.write_lambda_response(confirm_handler(event, None))
+            return
+
+        if parsed.path == "/cycle/assign":
+            event = make_event(body=body)
+            self.write_lambda_response(cycle_assign_handler(event, None))
+            return
+
+        if parsed.path == "/cycle/notify":
+            event = make_event(body=body)
+            self.write_lambda_response(cycle_notify_handler(event, None))
             return
 
         if parsed.path == "/saathi/chat/turn":
@@ -121,7 +161,7 @@ def main() -> int:
 
     server = ThreadingHTTPServer((args.host, args.port), LocalApiHandler)
     print(f"Marrow local API listening on http://{args.host}:{args.port}")
-    print("Available: GET /health, GET /forecast, GET /rank-donors, POST /family/ack, POST /notify/donor, GET /saathi/chat/open, POST /saathi/chat/turn, GET /conversations")
+    print("Available: GET /health, GET /forecast, GET /rank-donors, GET /bridge, GET /cycles, POST /cycle/run, POST /confirm, POST /cycle/assign, POST /cycle/notify, POST /family/ack, POST /notify/donor, POST /refusals, GET /saathi/chat/open, POST /saathi/chat/turn, GET /conversations")
     server.serve_forever()
     return 0
 

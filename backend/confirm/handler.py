@@ -25,7 +25,16 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         return response(400, {"error": "cycle_id and party (donor|patient) are required"})
 
     anchor_date = parse_date(body.get("anchor_date")) or date.today()
-    updated = apply_confirmation(get_store(), get_repository(), cycle_id, party, decision, anchor_date)
+    updated = apply_confirmation(
+        get_store(),
+        get_repository(),
+        cycle_id,
+        party,
+        decision,
+        anchor_date,
+        body.get("reason_bucket"),
+        body.get("text"),
+    )
     if updated is None:
         return response(404, {"error": "cycle not found", "cycle_id": cycle_id})
 

@@ -113,12 +113,26 @@ export const api = {
     return request<CyclesResponse>(`/cycles?${q.toString()}`)
   },
 
-  confirm: (cycle_id: string, party: 'donor' | 'patient', decision: 'yes' | 'no', anchor_date?: string) => {
+  confirm: (
+    cycle_id: string,
+    party: 'donor' | 'patient',
+    decision: 'yes' | 'no',
+    anchor_date?: string,
+    reason_bucket?: Refusal['reason_bucket'],
+    text?: string
+  ) => {
     if (FULL_MOCKS) return Promise.resolve(mocks.confirm(cycle_id, party, decision))
     const merged = withAnchor({ anchor_date })
     return request<Cycle>('/confirm', {
       method: 'POST',
-      body: JSON.stringify({ cycle_id, party, decision, ...(merged.anchor_date ? { anchor_date: merged.anchor_date } : {}) }),
+      body: JSON.stringify({
+        cycle_id,
+        party,
+        decision,
+        ...(merged.anchor_date ? { anchor_date: merged.anchor_date } : {}),
+        ...(reason_bucket ? { reason_bucket } : {}),
+        ...(text ? { text } : {}),
+      }),
     })
   },
 
@@ -127,6 +141,14 @@ export const api = {
     return request<Cycle>('/cycle/assign', {
       method: 'POST',
       body: JSON.stringify({ cycle_id, donor_id }),
+    })
+  },
+
+  notifyCycle: (cycle_id: string) => {
+    if (FULL_MOCKS) return Promise.resolve(mocks.notifyCycle(cycle_id))
+    return request<Cycle>('/cycle/notify', {
+      method: 'POST',
+      body: JSON.stringify({ cycle_id }),
     })
   },
 

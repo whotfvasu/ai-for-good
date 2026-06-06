@@ -29,9 +29,9 @@ const config: Config = {
         ink: '#1A0606',
       },
       fontFamily: {
-        // Plus Jakarta Sans is a free, geometric grotesque — closest free
-        // alternative to Lufga. Wired in via next/font in app/layout.tsx.
-        sans: ['var(--font-display)', 'system-ui', '-apple-system', 'sans-serif'],
+        // System-first stack keeps Amplify/local builds offline-safe. The
+        // visual style remains close enough for the hackathon demo.
+        sans: ['var(--font-display, ui-sans-serif)', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'],
       },
       letterSpacing: {
         tightest: '-0.04em',

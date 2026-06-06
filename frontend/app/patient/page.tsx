@@ -27,6 +27,7 @@ export default function PatientPage() {
 
   const nextDate = bridge?.next_needed_date ? formatDate(bridge.next_needed_date) : '—'
   const name = session ? patientLabel(session.id).display : 'Patient'
+  const tentativeDonor = bridge?.donors.find(d => d.eligible) ?? bridge?.donors[0]
 
   return (
     <div className="max-w-5xl mx-auto px-6 lg:px-10 py-10">
@@ -52,6 +53,13 @@ export default function PatientPage() {
         </p>
 
         <div className="mt-8 flex flex-wrap items-center gap-3">
+          {tentativeDonor && (
+            <div className="w-full sm:w-auto px-4 py-3 rounded-2xl bg-white/70 ring-1 ring-marrow-200/60">
+              <div className="text-[10px] uppercase tracking-[0.15em] text-marrow-700/70">Tentative bridge donor</div>
+              <div className="mt-0.5 font-semibold text-marrow-900">{donorLabel(tentativeDonor.donor_id)}</div>
+              <div className="text-xs text-marrow-900/60">{tentativeDonor.rotation_state.replace('_', ' ')} · Saathi confirming</div>
+            </div>
+          )}
           <button
             disabled={confirmed}
             onClick={async () => {

@@ -15,6 +15,7 @@ import base64
 import json
 import logging
 import os
+import ssl
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -58,8 +59,11 @@ def send_whatsapp(to: str | None, body: str) -> dict[str, Any]:
         data=data,
         headers={"Authorization": f"Basic {auth}", "Content-Type": "application/x-www-form-urlencoded"},
     )
+    context = None
+    if os.environ.get("TWILIO_DISABLE_SSL_VERIFY", "").lower() in {"1", "true", "yes"}:
+        context = ssl._create_unverified_context()
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=10, context=context) as resp:
             payload = json.loads(resp.read().decode())
             return {"sent": True, "sid": payload.get("sid"), "status": payload.get("status")}
     except urllib.error.HTTPError as e:

@@ -3,6 +3,7 @@
 .env
 .env.*
 !.env.example
+!.env.twilio.example
 *.pem
 *.key
 *.p12

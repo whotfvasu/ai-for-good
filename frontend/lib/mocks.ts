@@ -209,6 +209,23 @@ export const mocks = {
     updated_at: isoNow(),
   }),
 
+  notifyCycle: (cycle_id: string): Cycle => ({
+    cycle_id,
+    patient_id: demoPatients[0].id,
+    bridge_id: 'bridge_demo',
+    bridge_blood_group: 'O Positive',
+    assigned_donor_id: demoDonors[0].id,
+    next_needed_date: '2025-08-18',
+    donor_status: 'pending',
+    patient_status: 'pending',
+    state: 'auto_running',
+    note: 'WhatsApp confirmation request sent. Awaiting donor response.',
+    updated_at: isoNow(),
+    donor_notified_at: isoNow(),
+    last_notified_donor_id: demoDonors[0].id,
+    whatsapp_status: { sent: true, status: 'queued' },
+  }),
+
   donorInsight: (donor_id: string): DonorInsight => ({
     donor_id,
     engagement_state: 'warm',

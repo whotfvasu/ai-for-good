@@ -7,7 +7,7 @@ import type { Cycle } from '@/lib/types'
 import { sanitizeSaathiMessage } from '@/lib/sanitize'
 import { sharePlacard } from '@/lib/placard'
 import { useRequireRole } from '@/lib/useRequireRole'
-import type { ConversationTurn, DonorInsight } from '@/lib/types'
+import type { ConversationTurn, DonorInsight, Refusal } from '@/lib/types'
 
 const QUICK_NOS = ['Medical', 'Travel', 'Work', 'Fear', 'Tired', 'Trust'] as const
 const POLL_INTERVAL_MS = 4000
@@ -118,9 +118,10 @@ export default function DonorPage() {
     loadPendingCycle()
   }, [loadPendingCycle])
 
-  const respond = async (decision: 'yes' | 'no') => {
+  const respond = async (decision: 'yes' | 'no', reason?: Refusal['reason_bucket']) => {
     if (!pendingCycle) return
-    await api.confirm(pendingCycle.cycle_id, 'donor', decision)
+    const text = reason ? `I can't this time — ${reason}.` : undefined
+    await api.confirm(pendingCycle.cycle_id, 'donor', decision, undefined, reason, text)
     setPendingCycle(null)
     await loadPendingCycle()
   }
@@ -409,12 +410,13 @@ function timeAgo(iso: string): string {
 }
 
 // The donor's open ask — the real-world action that arrives on WhatsApp too.
-function ActionBanner({ cycle, onRespond }: { cycle: Cycle; onRespond: (d: 'yes' | 'no') => Promise<void> }) {
+function ActionBanner({ cycle, onRespond }: { cycle: Cycle; onRespond: (d: 'yes' | 'no', reason?: Refusal['reason_bucket']) => Promise<void> }) {
   const [busy, setBusy] = useState(false)
-  const go = async (d: 'yes' | 'no') => {
+  const [showReasons, setShowReasons] = useState(false)
+  const go = async (d: 'yes' | 'no', reason?: Refusal['reason_bucket']) => {
     setBusy(true)
     try {
-      await onRespond(d)
+      await onRespond(d, reason)
     } finally {
       setBusy(false)
     }
@@ -422,7 +424,7 @@ function ActionBanner({ cycle, onRespond }: { cycle: Cycle; onRespond: (d: 'yes'
   return (
     <div className="mb-4 rounded-3xl bg-marrow-900 text-marrow-50 p-5 shadow-glow">
       <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-marrow-200/70">
-        <span>💬 Also sent to your WhatsApp</span>
+        <span>💬 {cycle.donor_notified_at ? 'Also sent to your WhatsApp' : 'WhatsApp request queued'}</span>
       </div>
       <p className="mt-2 font-semibold leading-snug">
         {patientLabel(cycle.patient_id).display} needs {cycle.bridge_blood_group} on {cycle.next_needed_date}. Can you give?
@@ -436,13 +438,32 @@ function ActionBanner({ cycle, onRespond }: { cycle: Cycle; onRespond: (d: 'yes'
           Yes, I'll donate
         </button>
         <button
-          onClick={() => go('no')}
+          onClick={() => setShowReasons(prev => !prev)}
           disabled={busy}
           className="px-4 py-2 rounded-full bg-marrow-800 text-marrow-100 text-sm font-semibold hover:bg-marrow-700 transition-colors disabled:opacity-60"
         >
           Can't this time
         </button>
       </div>
+      {showReasons && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {QUICK_NOS.map(reason => (
+            <button
+              key={reason}
+              onClick={() => go('no', reason.toLowerCase() as Refusal['reason_bucket'])}
+              disabled={busy}
+              className="px-3 py-1.5 rounded-full bg-marrow-800 text-marrow-100 text-xs font-semibold hover:bg-marrow-700 disabled:opacity-60"
+            >
+              {reason}
+            </button>
+          ))}
+        </div>
+      )}
+      {cycle.whatsapp_status && (
+        <div className="mt-3 text-xs text-marrow-200/70">
+          Twilio: {cycle.whatsapp_status.sent ? cycle.whatsapp_status.status ?? 'sent' : cycle.whatsapp_status.reason ?? 'skipped'}
+        </div>
+      )}
     </div>
   )
 }
