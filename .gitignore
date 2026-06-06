@@ -1,0 +1,146 @@
+# ─── Secrets & credentials ────────────────────────────────────────────────
+# Never commit these. AWS keys, Bedrock creds, anything from Secrets Manager.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+.aws/
+aws-exports.js
+amplifyconfiguration.json
+secrets.json
+**/credentials
+
+# ─── Node / React (frontend/) ─────────────────────────────────────────────
+node_modules/
+dist/
+build/
+.next/
+out/
+.cache/
+.parcel-cache/
+.vite/
+*.tsbuildinfo
+.eslintcache
+.stylelintcache
+
+# Frontend env files (use .env.example for the template)
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# ─── Python / Lambda (backend/, scripts/, models/) ───────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+*.egg-info/
+*.egg
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Lambda packaging artifacts
+backend/**/package/
+backend/**/build/
+backend/**/dist/
+*.zip
+!docs/*.zip          # keep any docs we explicitly ship as zip
+
+# ─── AWS tooling ──────────────────────────────────────────────────────────
+.aws-sam/
+.sam/
+samconfig.toml
+cdk.out/
+cdk.context.json
+.serverless/
+
+# Amplify local artifacts (the generated config is checked in only as example)
+amplify/.config/local-*-info.json
+amplify/.config/local-env-info.json
+amplify/mock-data/
+amplify/backend/.temp/
+amplify/backend/awscloudformation/build/
+
+# Terraform (if we use it later)
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+
+# ─── ML artifacts ─────────────────────────────────────────────────────────
+# We ship models/propensity.json (the trained model) — that's tracked.
+# Ignore everything else: raw checkpoints, large weights, training intermediates.
+models/checkpoints/
+models/*.pkl
+models/*.bin
+models/*.pt
+models/*.h5
+models/*.onnx
+models/training_runs/
+mlruns/
+wandb/
+
+# ─── Data ─────────────────────────────────────────────────────────────────
+# Keep Dataset.csv (the given dataset). Ignore derived/scratch data.
+data/
+*.parquet
+*.tsv
+scratch/
+tmp/
+*.tmp
+
+# ─── IDE / editor ─────────────────────────────────────────────────────────
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea/
+*.iml
+*.swp
+*.swo
+*.swn
+.zed/
+
+# ─── OS junk ──────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ─── Logs & runtime ───────────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ─── Excalidraw plugin local cache ────────────────────────────────────────
+# We keep .excalidraw and .excalidraw.md tracked.
+.excalidraw-stash/
+.obsidian/workspace*
+.obsidian/cache
+
+# ─── Misc ─────────────────────────────────────────────────────────────────
+.docusaurus/
+.history/
+*.bak
+*.orig
