@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/lib/api'
-import { demoPatients } from '@/lib/mocks'
+import { donorLabel, patientLabel } from '@/lib/labels'
 import type { ForecastItem, RankedDonor } from '@/lib/types'
 import clsx from 'clsx'
 
@@ -12,7 +12,15 @@ export default function CoordinatorPage() {
   const [donors, setDonors] = useState<RankedDonor[]>([])
   const [loadingForecast, setLoadingForecast] = useState(true)
   const [loadingDonors, setLoadingDonors] = useState(false)
-  const reassuredThisWeek = 31 // hero metric; will pull from cycles when live
+  const [errors, setErrors] = useState<string | null>(null)
+
+  // The hero metric is computed from the live forecast: how many high-confidence
+  // patients in the window we *could* reassure proactively. Once /family/ack
+  // backs onto Cycles, this swaps to the persisted count.
+  const reassuredThisWeek = useMemo(
+    () => forecast.filter(f => f.confidence === 'high').length,
+    [forecast]
+  )
 
   useEffect(() => {
     api
@@ -21,6 +29,7 @@ export default function CoordinatorPage() {
         setForecast(res.items)
         if (res.items[0]) setActivePatient(res.items[0].patient_id)
       })
+      .catch(e => setErrors(`Forecast failed: ${e.message}. Showing empty state.`))
       .finally(() => setLoadingForecast(false))
   }, [])
 
@@ -30,21 +39,28 @@ export default function CoordinatorPage() {
     api
       .rankDonors(activePatient, 5)
       .then(res => setDonors(res.items))
+      .catch(e => setErrors(`Donor ranking failed: ${e.message}.`))
       .finally(() => setLoadingDonors(false))
   }, [activePatient])
 
   return (
     <div className="max-w-7xl mx-auto px-6 lg:px-10 py-10">
+      {errors && (
+        <div className="mb-6 p-4 rounded-2xl bg-marrow-100 text-marrow-900 text-sm ring-1 ring-marrow-300">
+          {errors}
+        </div>
+      )}
+
       {/* Hero strip */}
       <div className="grid lg:grid-cols-3 gap-5">
         <HeroMetric
           big={String(reassuredThisWeek)}
-          label="Families reassured this week"
-          sub="Reached before they had to ask"
+          label="Families to reassure"
+          sub="High-confidence forecasts in the next 7 days"
           variant="primary"
         />
         <HeroMetric big={String(forecast.length)} label="Patients due in 7 days" sub="From the predictive forecast" />
-        <HeroMetric big="8h 14m" label="Phone time saved" sub="Saathi handled outreach drafts" />
+        <HeroMetric big="8h 14m" label="Phone time saved" sub="Saathi handles outreach drafts" />
       </div>
 
       {/* Two-pane */}
@@ -58,28 +74,31 @@ export default function CoordinatorPage() {
             </div>
             <span className="pill bg-marrow-100 text-marrow-700">Next 7d</span>
           </header>
-          <ul className="divide-y divide-marrow-100">
+          <ul className="divide-y divide-marrow-100 max-h-[520px] overflow-y-auto">
             {loadingForecast && <Skeleton lines={3} />}
-            {!loadingForecast && forecast.length === 0 && <Empty label="No patients due this window." />}
-            {forecast.map(item => (
-              <li key={item.patient_id}>
-                <button
-                  onClick={() => setActivePatient(item.patient_id)}
-                  className={clsx(
-                    'w-full text-left px-6 py-4 flex items-center justify-between gap-4 transition-colors',
-                    activePatient === item.patient_id ? 'bg-marrow-50' : 'hover:bg-marrow-50/60'
-                  )}
-                >
-                  <div>
-                    <div className="font-semibold text-marrow-900">{patientLabel(item.patient_id)}</div>
-                    <div className="text-xs text-marrow-900/60 mt-0.5">
-                      {item.blood_group} · in {item.days_to_needed} days · {item.next_needed_date}
+            {!loadingForecast && forecast.length === 0 && <Empty label="No patients due in this window." />}
+            {forecast.map(item => {
+              const label = patientLabel(item.patient_id)
+              return (
+                <li key={item.patient_id}>
+                  <button
+                    onClick={() => setActivePatient(item.patient_id)}
+                    className={clsx(
+                      'w-full text-left px-6 py-4 flex items-center justify-between gap-4 transition-colors',
+                      activePatient === item.patient_id ? 'bg-marrow-50' : 'hover:bg-marrow-50/60'
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <div className="font-semibold text-marrow-900">{label.display}</div>
+                      <div className="text-xs text-marrow-900/60 mt-0.5">
+                        {item.blood_group} · in {item.days_to_needed}d · {item.next_needed_date}
+                      </div>
                     </div>
-                  </div>
-                  <ConfidencePill confidence={item.confidence} worry={item.worry_score} />
-                </button>
-              </li>
-            ))}
+                    <ConfidencePill confidence={item.confidence} worry={item.worry_score} />
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         </section>
 
@@ -88,14 +107,18 @@ export default function CoordinatorPage() {
           <header className="px-6 pt-6 pb-4 flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold tracking-tightest text-marrow-900">
-                Ranked donors {activePatient && <span className="text-marrow-600">· {patientLabel(activePatient)}</span>}
+                Ranked donors{' '}
+                {activePatient && (
+                  <span className="text-marrow-600">· {patientLabel(activePatient).display}</span>
+                )}
               </h2>
-              <p className="text-xs text-marrow-900/60 mt-0.5">Score factors are shown in plain English</p>
+              <p className="text-xs text-marrow-900/60 mt-0.5">Score factors in plain English</p>
             </div>
             <span className="pill bg-marrow-100 text-marrow-700">Top 5</span>
           </header>
           <ul className="divide-y divide-marrow-100">
             {loadingDonors && <Skeleton lines={3} />}
+            {!loadingDonors && donors.length === 0 && <Empty label="No compatible donors found." />}
             {!loadingDonors && donors.map(d => <DonorRow key={d.donor_id} donor={d} />)}
           </ul>
         </section>
@@ -142,7 +165,12 @@ function DonorRow({ donor }: { donor: RankedDonor }) {
           {' · '}
           {Math.round(f.responsiveness * 100)}% responsive
           {' · '}
-          {f.distance_km ? `${f.distance_km.toFixed(1)} km` : 'distance unknown'}
+          {/* Dataset reality: every CSV row shares the same default lat/lng,
+             so haversine returns 0. We treat exact-zero as unknown instead of
+             pretending the donor lives in the patient's bed. */}
+          {f.distance_km === null || f.distance_km === 0
+            ? 'distance unknown'
+            : `${f.distance_km.toFixed(1)} km`}
           {' · '}
           last {f.days_since_last ?? '–'}d ago
         </div>
@@ -211,20 +239,4 @@ function Skeleton({ lines }: { lines: number }) {
 
 function Empty({ label }: { label: string }) {
   return <li className="px-6 py-10 text-center text-sm text-marrow-900/60">{label}</li>
-}
-
-// Demo-friendly labels: if the patient is from our seed list, use the name;
-// otherwise show a shortened id.
-function patientLabel(id: string) {
-  return demoPatients.find(p => p.id === id)?.name ?? id.slice(0, 10) + '…'
-}
-function donorLabel(id: string) {
-  const known: Record<string, string> = {
-    d_priya: 'Priya R.',
-    d_arjun: 'Arjun M.',
-    d_neha: 'Neha S.',
-    d_rohit: 'Rohit T.',
-    d_ananya: 'Ananya K.',
-  }
-  return known[id] ?? id.slice(0, 10) + '…'
 }
