@@ -44,13 +44,13 @@ export function Navbar() {
           })}
         </nav>
 
-        <Link
+        {/* <Link
           href="/coordinator"
           className="hidden md:inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-marrow-600 hover:bg-marrow-700 text-white text-sm font-semibold transition-colors"
         >
           Open dashboard
           <span aria-hidden>→</span>
-        </Link>
+        </Link> */}
       </div>
     </header>
   )
