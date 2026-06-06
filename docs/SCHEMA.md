@@ -50,6 +50,8 @@ This schema reflects the actual `Dataset.csv` columns in this repository. The CS
 
 Recommended GSI: `DonorsByBloodGroup` with partition key `blood_group` and sort key `eligibility_status`.
 
+The current setup script creates the core table keys only. Add GSIs after L1 if query speed becomes a visible problem; for 4,826 donors, a scan is acceptable for the demo.
+
 ### `Cycles`
 
 | Attribute | Type | Notes |

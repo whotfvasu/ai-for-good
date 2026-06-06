@@ -4,8 +4,16 @@ import csv
 import os
 from functools import lru_cache
 from pathlib import Path
+from typing import Protocol
 
-from .constants import DATASET_PATH_ENV
+from .constants import (
+    DATASET_PATH_ENV,
+    DEFAULT_DONORS_TABLE,
+    DEFAULT_PATIENTS_TABLE,
+    DONORS_TABLE_ENV,
+    PATIENTS_TABLE_ENV,
+    REPOSITORY_MODE_ENV,
+)
 from .dates import parse_date, parse_float, parse_int
 from .models import Donor, Patient
 
@@ -103,6 +111,95 @@ class CsvRepository:
             return list(csv.DictReader(dataset))
 
 
+class Repository(Protocol):
+    def patients(self) -> list[Patient]:
+        ...
+
+    def donors(self) -> list[Donor]:
+        ...
+
+    def patient(self, patient_id: str) -> Patient | None:
+        ...
+
+
+class DynamoRepository:
+    def __init__(
+        self,
+        patients_table_name: str | None = None,
+        donors_table_name: str | None = None,
+    ) -> None:
+        import boto3
+
+        dynamodb = boto3.resource("dynamodb")
+        self.patients_table = dynamodb.Table(
+            patients_table_name or os.environ.get(PATIENTS_TABLE_ENV, DEFAULT_PATIENTS_TABLE)
+        )
+        self.donors_table = dynamodb.Table(
+            donors_table_name or os.environ.get(DONORS_TABLE_ENV, DEFAULT_DONORS_TABLE)
+        )
+
+    def patients(self) -> list[Patient]:
+        return [_patient_from_item(item) for item in _scan_all(self.patients_table)]
+
+    def donors(self) -> list[Donor]:
+        return [_donor_from_item(item) for item in _scan_all(self.donors_table)]
+
+    def patient(self, patient_id: str) -> Patient | None:
+        response = self.patients_table.get_item(Key={"patient_id": _clean_id(patient_id)})
+        item = response.get("Item")
+        return _patient_from_item(item) if item else None
+
+
+def _scan_all(table) -> list[dict]:
+    items: list[dict] = []
+    scan_kwargs = {}
+
+    while True:
+        response = table.scan(**scan_kwargs)
+        items.extend(response.get("Items", []))
+        last_key = response.get("LastEvaluatedKey")
+        if not last_key:
+            return items
+        scan_kwargs["ExclusiveStartKey"] = last_key
+
+
+def _patient_from_item(item: dict) -> Patient:
+    return Patient(
+        patient_id=str(item.get("patient_id", "")),
+        blood_group=str(item.get("blood_group", "")),
+        latitude=parse_float(item.get("latitude")),
+        longitude=parse_float(item.get("longitude")),
+        last_transfusion_date=parse_date(item.get("last_transfusion_date")),
+        expected_next_transfusion_date=parse_date(item.get("next_needed_date")),
+        frequency_in_days=parse_int(item.get("frequency_in_days")),
+        quantity_required=parse_int(item.get("quantity_required")),
+        gender=item.get("gender"),
+        status=item.get("status"),
+    )
+
+
+def _donor_from_item(item: dict) -> Donor:
+    return Donor(
+        donor_id=str(item.get("donor_id", "")),
+        blood_group=str(item.get("blood_group", "")),
+        latitude=parse_float(item.get("latitude")),
+        longitude=parse_float(item.get("longitude")),
+        donor_type=item.get("donor_type"),
+        last_contacted_date=parse_date(item.get("last_contacted_date")),
+        last_donation_date=parse_date(item.get("last_donation_date")),
+        next_eligible_date=parse_date(item.get("next_eligible_date")),
+        donations_till_date=parse_int(item.get("donations_till_date"), 0) or 0,
+        eligibility_status=item.get("eligibility_status"),
+        cycle_of_donations=parse_int(item.get("cycle_of_donations")),
+        total_calls=parse_int(item.get("total_calls"), 0) or 0,
+        calls_to_donations_ratio=parse_float(item.get("calls_to_donations_ratio")),
+        active_status=item.get("active_status"),
+        inactive_trigger_comment=item.get("inactive_trigger_comment"),
+    )
+
+
 @lru_cache(maxsize=1)
-def get_repository() -> CsvRepository:
+def get_repository() -> Repository:
+    if os.environ.get(REPOSITORY_MODE_ENV, "csv").lower() == "dynamodb":
+        return DynamoRepository()
     return CsvRepository()
