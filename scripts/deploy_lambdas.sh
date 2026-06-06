@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Deploy the four Marrow L1 Lambdas + the shared IAM role.
+# Deploy the Marrow Lambdas + the shared IAM role.
 #
 #   bash scripts/deploy_lambdas.sh
 #
@@ -13,7 +13,7 @@
 #   - DynamoDB tables already created (scripts/create_dynamodb_tables.py)
 #   - Data already loaded (scripts/load_dataset.py)
 #
-# Does NOT wire API Gateway — that's the next step, done in the console.
+# Does NOT wire API Gateway — use scripts/deploy_api_gateway.sh next.
 
 set -euo pipefail
 
@@ -65,9 +65,14 @@ EOF
     --description "Execution role for Marrow L1 Lambdas (DynamoDB read + CloudWatch logs)" \
     --query 'Role.Arn' --output text)
   rm -f "$TRUST"
+  echo "  waiting 12s for IAM propagation..."
+  sleep 12
+fi
+echo "  role: $ROLE_ARN"
 
-  PERMS=$(mktemp)
-  cat > "$PERMS" <<EOF
+echo "  applying inline policy..."
+PERMS=$(mktemp)
+cat > "$PERMS" <<EOF
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -95,35 +100,45 @@ EOF
         "arn:aws:dynamodb:$REGION:*:table/Donors",
         "arn:aws:dynamodb:$REGION:*:table/Cycles",
         "arn:aws:dynamodb:$REGION:*:table/Conversations",
-        "arn:aws:dynamodb:$REGION:*:table/Refusals"
+        "arn:aws:dynamodb:$REGION:*:table/Refusals",
+        "arn:aws:dynamodb:$REGION:*:table/DonorInsights"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:InvokeModel"
+      ],
+      "Resource": [
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+        "arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0"
       ]
     }
   ]
 }
 EOF
 
-  aws iam put-role-policy \
-    --role-name "$ROLE_NAME" \
-    --policy-name MarrowLambdaPolicy \
-    --policy-document "file://$PERMS"
-  rm -f "$PERMS"
+aws iam put-role-policy \
+  --role-name "$ROLE_NAME" \
+  --policy-name MarrowLambdaPolicy \
+  --policy-document "file://$PERMS"
+rm -f "$PERMS"
 
-  echo "  waiting 12s for IAM propagation..."
-  sleep 12
-fi
-echo "  role: $ROLE_ARN"
-
-# -- 3. Deploy the four Lambdas --------------------------------------------
+# -- 3. Deploy the Lambdas -------------------------------------------------
 # name|handler
 LAMBDAS=(
   "marrow-health|backend.health.handler.lambda_handler"
   "marrow-forecast|backend.forecast.handler.lambda_handler"
   "marrow-rank-donors|backend.rank_donors.handler.lambda_handler"
   "marrow-family-ack|backend.family_ack.handler.lambda_handler"
+  "marrow-notify-donor|backend.notify_donor.handler.lambda_handler"
+  "marrow-distill-insight|backend.distill_insight.handler.lambda_handler"
+  "marrow-saathi-chat|backend.saathi_chat.handler.lambda_handler"
 )
 
 # Shared env vars — flips repository.py from CsvRepository to DynamoRepository.
-ENV_JSON='{"Variables":{"MARROW_REPOSITORY":"dynamodb","MARROW_PATIENTS_TABLE":"Patients","MARROW_DONORS_TABLE":"Donors"}}'
+ENV_JSON='{"Variables":{"MARROW_REPOSITORY":"dynamodb","MARROW_PATIENTS_TABLE":"Patients","MARROW_DONORS_TABLE":"Donors","MARROW_INSIGHTS_TABLE":"DonorInsights","MARROW_CONVERSATIONS_TABLE":"Conversations","MARROW_DISTILL_INSIGHT_FUNCTION":"marrow-distill-insight"}}'
 
 deployed_arns=()
 
@@ -148,7 +163,6 @@ for entry in "${LAMBDAS[@]}"; do
     aws lambda update-function-configuration \
       --function-name "$NAME" \
       --runtime python3.12 \
-      --architectures arm64 \
       --role "$ROLE_ARN" \
       --handler "$HANDLER" \
       --memory-size 256 \
@@ -183,7 +197,7 @@ for entry in "${LAMBDAS[@]}"; do
 done
 
 echo ""
-echo "OK All four Lambdas deployed."
+echo "OK All Lambdas deployed."
 echo ""
 echo "Summary:"
 for line in "${deployed_arns[@]}"; do

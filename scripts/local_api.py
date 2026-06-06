@@ -14,7 +14,9 @@ sys.path.insert(0, str(ROOT))
 from backend.family_ack.handler import lambda_handler as family_ack_handler
 from backend.forecast.handler import lambda_handler as forecast_handler
 from backend.health.handler import lambda_handler as health_handler
+from backend.notify_donor.handler import lambda_handler as notify_donor_handler
 from backend.rank_donors.handler import lambda_handler as rank_donors_handler
+from backend.saathi_chat.handler import lambda_handler as saathi_chat_handler
 
 
 def make_event(query: dict[str, list[str]] | None = None, body: str | None = None) -> dict:
@@ -50,6 +52,15 @@ class LocalApiHandler(BaseHTTPRequestHandler):
             self.write_lambda_response(rank_donors_handler(make_event(query), None))
             return
 
+        if parsed.path in {"/saathi/chat/open", "/conversations"} or (
+            parsed.path.startswith("/donor/") and parsed.path.endswith("/insight")
+        ):
+            event = make_event(query)
+            event["rawPath"] = parsed.path
+            event["requestContext"] = {"http": {"method": "GET"}}
+            self.write_lambda_response(saathi_chat_handler(event, None))
+            return
+
         self.write_json(404, {"error": "not found", "path": parsed.path})
 
     def do_POST(self) -> None:
@@ -59,6 +70,18 @@ class LocalApiHandler(BaseHTTPRequestHandler):
 
         if parsed.path == "/family/ack":
             self.write_lambda_response(family_ack_handler(make_event(body=body), None))
+            return
+
+        if parsed.path == "/notify/donor":
+            event = make_event(body=body)
+            self.write_lambda_response(notify_donor_handler(event, None))
+            return
+
+        if parsed.path == "/saathi/chat/turn":
+            event = make_event(body=body)
+            event["rawPath"] = parsed.path
+            event["requestContext"] = {"http": {"method": "POST"}}
+            self.write_lambda_response(saathi_chat_handler(event, None))
             return
 
         self.write_json(404, {"error": "not found", "path": parsed.path})
@@ -98,7 +121,7 @@ def main() -> int:
 
     server = ThreadingHTTPServer((args.host, args.port), LocalApiHandler)
     print(f"Marrow local API listening on http://{args.host}:{args.port}")
-    print("Available: GET /health, GET /forecast, GET /rank-donors, POST /family/ack")
+    print("Available: GET /health, GET /forecast, GET /rank-donors, POST /family/ack, POST /notify/donor, GET /saathi/chat/open, POST /saathi/chat/turn, GET /conversations")
     server.serve_forever()
     return 0
 

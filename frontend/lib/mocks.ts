@@ -5,6 +5,7 @@
 import type {
   ConversationTurn,
   ForecastResponse,
+  NotifyDonorResponse,
   RankDonorsResponse,
   Refusal,
   SaathiOutreachResponse,
@@ -73,6 +74,19 @@ export const mocks = {
         `${p.name}'s next transfusion is in 3 days. Could you make an hour for it?`,
       model: 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
       usage: { input_tokens: 312, output_tokens: 58 },
+    }
+  },
+
+  notifyDonor: ({ donor_id, patient_id, trigger }: { donor_id: string; patient_id: string; trigger: string }): NotifyDonorResponse => {
+    const outreach = mocks.saathiOutreach({ donor_id, patient_id })
+    return {
+      donor_id,
+      ts: isoNow(),
+      message: `[${trigger}] ${outreach.message}`,
+      model: outreach.model,
+      usage: outreach.usage,
+      channel: 'whatsapp',
+      language: 'en',
     }
   },
 

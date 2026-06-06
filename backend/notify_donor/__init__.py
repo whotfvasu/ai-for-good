@@ -1,0 +1,1 @@
+"""Donor notification lambda package."""

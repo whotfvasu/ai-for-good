@@ -66,3 +66,13 @@ export interface SaathiOutreachResponse {
   model: string
   usage?: { input_tokens: number; output_tokens: number }
 }
+
+export interface NotifyDonorResponse {
+  donor_id: string
+  ts: string
+  message: string
+  model: string
+  usage?: { input_tokens: number; output_tokens: number }
+  channel: string
+  language: string
+}

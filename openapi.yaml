@@ -173,6 +173,31 @@ paths:
                     format: date-time
                   status:
                     type: string
+  /notify/donor:
+    post:
+      summary: Generate and persist a donor notification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [donor_id, patient_id, trigger]
+              properties:
+                donor_id:
+                  type: string
+                patient_id:
+                  type: string
+                trigger:
+                  type: string
+                  enum: [approval, cycle_due, eligibility_back, refusal_expired, curriculum_day_X]
+      responses:
+        "200":
+          description: Generated notification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotifyDonorResponse"
   /saathi/chat/open:
     get:
       summary: Open donor chat with memory-aware continuity message
@@ -250,6 +275,22 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/ConversationTurn"
+  /donor/{id}/insight:
+    get:
+      summary: Get a donor's distilled cold-memory insight
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Donor insight
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DonorInsight"
   /refusals:
     post:
       summary: Capture structured or free-text donor refusal
@@ -399,7 +440,7 @@ components:
                 group_compat:
                   type: number
                 recency_weight:
-                  type: number
+              type: number
     DonorSummary:
       type: object
       properties:
@@ -410,6 +451,24 @@ components:
         donor_type:
           type: string
           nullable: true
+    NotifyDonorResponse:
+      type: object
+      properties:
+        donor_id:
+          type: string
+        ts:
+          type: string
+          format: date-time
+        message:
+          type: string
+        model:
+          type: string
+        usage:
+          type: object
+        channel:
+          type: string
+        language:
+          type: string
     ConversationTurn:
       type: object
       properties:
@@ -427,6 +486,48 @@ components:
           type: string
         meta:
           type: object
+    DonorInsight:
+      type: object
+      properties:
+        donor_id:
+          type: string
+        engagement_state:
+          type: string
+          enum: [warm, drifting, dormant, lapsed]
+        preferred_channel:
+          type: string
+          enum: [whatsapp, sms, voice, email]
+        preferred_language:
+          type: string
+          enum: [en, hi, te]
+        preferred_time_window:
+          type: string
+          enum: [morning, evening, weekend, any]
+        name_used:
+          type: string
+        last_refusal_reason:
+          type: string
+          nullable: true
+        last_refusal_expires_at:
+          type: string
+          nullable: true
+        lifetime_donations:
+          type: integer
+        patient_bond:
+          type: string
+        what_motivates:
+          type: array
+          items:
+            type: string
+        what_to_avoid:
+          type: array
+          items:
+            type: string
+        summary_120w:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
     Refusal:
       type: object
       properties:

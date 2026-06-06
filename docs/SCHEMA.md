@@ -86,6 +86,25 @@ Recommended GSI: `CyclesByStatus` with partition key `status` and sort key `next
 | `text` | string | Original donor text when available |
 | `expires_at` | string | ISO date when the refusal should stop suppressing outreach |
 
+### `DonorInsights`
+
+| Attribute | Type | Notes |
+|---|---|---|
+| `donor_id` | string | Partition key |
+| `engagement_state` | string | `warm`, `drifting`, `dormant`, or `lapsed` |
+| `preferred_channel` | string | `whatsapp`, `sms`, `voice`, or `email` |
+| `preferred_language` | string | `en`, `hi`, or `te` |
+| `preferred_time_window` | string | `morning`, `evening`, `weekend`, or `any` |
+| `name_used` | string | Preferred donor name |
+| `last_refusal_reason` | string | Most recent refusal bucket |
+| `last_refusal_expires_at` | string | ISO date when refusal expires |
+| `lifetime_donations` | number | Total historical donations |
+| `patient_bond` | string | Short note on any named patient connection |
+| `what_motivates` | list | Stable motivations for future outreach |
+| `what_to_avoid` | list | Phrases or themes to avoid |
+| `summary_120w` | string | Compressed cold-memory summary |
+| `updated_at` | string | ISO timestamp |
+
 ## Local Demo Caveat
 
 The checked-in handlers read directly from `Dataset.csv` so Harsh can test logic before AWS resources exist. The `scripts/load_dataset.py` script writes the same normalized records into DynamoDB for deployment.

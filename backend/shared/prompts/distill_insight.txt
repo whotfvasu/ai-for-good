@@ -1,0 +1,23 @@
+You are compressing donor history into a small machine-readable memory record.
+
+Return strict JSON only, matching this schema:
+- donor_id
+- engagement_state
+- preferred_channel
+- preferred_language
+- preferred_time_window
+- name_used
+- last_refusal_reason
+- last_refusal_expires_at
+- lifetime_donations
+- patient_bond
+- what_motivates
+- what_to_avoid
+- summary_120w
+- updated_at
+
+Donor profile:
+{donor_profile}
+
+Recent turns:
+{turns}

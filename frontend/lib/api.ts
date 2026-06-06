@@ -23,6 +23,7 @@ import { mocks } from './mocks'
 import type {
   ConversationTurn,
   ForecastResponse,
+  NotifyDonorResponse,
   RankDonorsResponse,
   Refusal,
   SaathiOutreachResponse,
@@ -93,6 +94,11 @@ export const api = {
   saathiOutreach: (body: { donor_id: string; patient_id: string; language: string; register: 'formal' | 'intimate' }) => {
     if (L2_MOCKS) return Promise.resolve(mocks.saathiOutreach(body))
     return request<SaathiOutreachResponse>('/saathi/outreach', { method: 'POST', body: JSON.stringify(body) })
+  },
+
+  notifyDonor: (body: { donor_id: string; patient_id: string; trigger: string }) => {
+    if (L2_MOCKS) return Promise.resolve(mocks.notifyDonor(body))
+    return request<NotifyDonorResponse>('/notify/donor', { method: 'POST', body: JSON.stringify(body) })
   },
 
   chatOpen: (donor_id: string) => {

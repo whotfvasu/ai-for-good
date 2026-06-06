@@ -10,6 +10,8 @@ export default function CoordinatorPage() {
   const [forecast, setForecast] = useState<ForecastItem[]>([])
   const [activePatient, setActivePatient] = useState<string | null>(null)
   const [donors, setDonors] = useState<RankedDonor[]>([])
+  const [notifyingDonorId, setNotifyingDonorId] = useState<string | null>(null)
+  const [latestOutreach, setLatestOutreach] = useState<string | null>(null)
   const [loadingForecast, setLoadingForecast] = useState(true)
   const [loadingDonors, setLoadingDonors] = useState(false)
   const [errors, setErrors] = useState<string | null>(null)
@@ -119,8 +121,37 @@ export default function CoordinatorPage() {
           <ul className="divide-y divide-marrow-100">
             {loadingDonors && <Skeleton lines={3} />}
             {!loadingDonors && donors.length === 0 && <Empty label="No compatible donors found." />}
-            {!loadingDonors && donors.map(d => <DonorRow key={d.donor_id} donor={d} />)}
+            {!loadingDonors && donors.map(d => (
+              <DonorRow
+                key={d.donor_id}
+                donor={d}
+                notifying={notifyingDonorId === d.donor_id}
+                onApprove={async () => {
+                  if (!activePatient) return
+                  setNotifyingDonorId(d.donor_id)
+                  try {
+                    const result = await api.notifyDonor({
+                      donor_id: d.donor_id,
+                      patient_id: activePatient,
+                      trigger: 'approval',
+                    })
+                    setLatestOutreach(result.message)
+                  } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Unknown outreach error'
+                    setErrors(`Outreach failed: ${message}.`)
+                  } finally {
+                    setNotifyingDonorId(null)
+                  }
+                }}
+              />
+            ))}
           </ul>
+          {latestOutreach && (
+            <div className="px-6 py-4 border-t border-marrow-100 bg-marrow-50/60">
+              <div className="text-xs uppercase tracking-[0.12em] text-marrow-700/70">Latest outreach draft</div>
+              <p className="mt-2 text-sm leading-relaxed text-marrow-900">{latestOutreach}</p>
+            </div>
+          )}
         </section>
       </div>
     </div>
@@ -154,7 +185,15 @@ function HeroMetric({
   )
 }
 
-function DonorRow({ donor }: { donor: RankedDonor }) {
+function DonorRow({
+  donor,
+  notifying,
+  onApprove,
+}: {
+  donor: RankedDonor
+  notifying: boolean
+  onApprove: () => Promise<void>
+}) {
   const f = donor.factors
   return (
     <li className="px-6 py-4 flex items-center justify-between gap-4">
@@ -177,8 +216,12 @@ function DonorRow({ donor }: { donor: RankedDonor }) {
       </div>
       <div className="flex items-center gap-3">
         <ScoreRing score={donor.score} />
-        <button className="px-3.5 py-2 rounded-full bg-marrow-900 hover:bg-marrow-800 text-white text-xs font-semibold transition-colors">
-          Approve outreach
+        <button
+          onClick={onApprove}
+          disabled={notifying}
+          className="px-3.5 py-2 rounded-full bg-marrow-900 hover:bg-marrow-800 text-white text-xs font-semibold transition-colors disabled:opacity-60"
+        >
+          {notifying ? 'Drafting...' : 'Approve outreach'}
         </button>
       </div>
     </li>

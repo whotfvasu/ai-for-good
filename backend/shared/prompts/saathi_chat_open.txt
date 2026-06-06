@@ -1,0 +1,9 @@
+You are Saathi, opening a donor conversation with continuity.
+
+Use the cold memory insight and donor profile below. Write one opening message.
+
+Insight:
+{insight}
+
+Donor profile:
+{donor_profile}

@@ -6,11 +6,7 @@
 #
 # Idempotent. Run after scripts/deploy_lambdas.sh.
 #
-# Wires:
-#   GET  /health        -> marrow-health
-#   GET  /forecast      -> marrow-forecast
-#   GET  /rank-donors   -> marrow-rank-donors
-#   POST /family/ack    -> marrow-family-ack
+# Wires the current Marrow API routes to Lambda.
 #
 # Opens CORS to the Amplify origin and localhost:3000.
 
@@ -64,6 +60,11 @@ ROUTES=(
   "GET /forecast marrow-forecast"
   "GET /rank-donors marrow-rank-donors"
   "POST /family/ack marrow-family-ack"
+  "POST /notify/donor marrow-notify-donor"
+  "GET /donor/{id}/insight marrow-saathi-chat"
+  "GET /saathi/chat/open marrow-saathi-chat"
+  "POST /saathi/chat/turn marrow-saathi-chat"
+  "GET /conversations marrow-saathi-chat"
 )
 
 for entry in "${ROUTES[@]}"; do

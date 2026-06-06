@@ -106,6 +106,10 @@ class CsvRepository:
         normalized_id = _clean_id(patient_id)
         return next((patient for patient in self.patients() if patient.patient_id == normalized_id), None)
 
+    def donor(self, donor_id: str) -> Donor | None:
+        normalized_id = _clean_id(donor_id)
+        return next((donor for donor in self.donors() if donor.donor_id == normalized_id), None)
+
     def _read_rows(self) -> list[dict[str, str]]:
         with self.dataset_path.open(newline="", encoding="utf-8-sig") as dataset:
             return list(csv.DictReader(dataset))
@@ -119,6 +123,9 @@ class Repository(Protocol):
         ...
 
     def patient(self, patient_id: str) -> Patient | None:
+        ...
+
+    def donor(self, donor_id: str) -> Donor | None:
         ...
 
 
@@ -148,6 +155,11 @@ class DynamoRepository:
         response = self.patients_table.get_item(Key={"patient_id": _clean_id(patient_id)})
         item = response.get("Item")
         return _patient_from_item(item) if item else None
+
+    def donor(self, donor_id: str) -> Donor | None:
+        response = self.donors_table.get_item(Key={"donor_id": _clean_id(donor_id)})
+        item = response.get("Item")
+        return _donor_from_item(item) if item else None
 
 
 def _scan_all(table) -> list[dict]:
