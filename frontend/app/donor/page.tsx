@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import { donorLabel } from '@/lib/labels'
+import { sanitizeSaathiMessage } from '@/lib/sanitize'
 import type { ConversationTurn, DonorInsight } from '@/lib/types'
 
 const QUICK_NOS = ['Medical', 'Travel', 'Work', 'Fear', 'Tired', 'Trust'] as const
@@ -321,6 +322,8 @@ function Bubble({
   muted?: boolean
 }) {
   const isUser = role === 'user'
+  // Only model-authored bubbles get sanitized; user text is shown verbatim.
+  const display = isUser ? text : sanitizeSaathiMessage(text)
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-up`}>
       <div
@@ -330,7 +333,7 @@ function Bubble({
             : 'bg-white ring-1 ring-marrow-200/60 text-marrow-900 rounded-bl-md'
         } ${muted ? 'opacity-60' : ''}`}
       >
-        {text}
+        {display}
       </div>
     </div>
   )

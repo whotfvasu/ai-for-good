@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/lib/api'
 import { donorLabel, patientLabel } from '@/lib/labels'
+import { sanitizeSaathiMessage } from '@/lib/sanitize'
 import type { ForecastItem, RankedDonor } from '@/lib/types'
 import clsx from 'clsx'
 
@@ -135,7 +136,7 @@ export default function CoordinatorPage() {
                       patient_id: activePatient,
                       trigger: 'approval',
                     })
-                    setLatestOutreach(result.message)
+                    setLatestOutreach(sanitizeSaathiMessage(result.message))
                   } catch (error) {
                     const message = error instanceof Error ? error.message : 'Unknown outreach error'
                     setErrors(`Outreach failed: ${message}.`)
