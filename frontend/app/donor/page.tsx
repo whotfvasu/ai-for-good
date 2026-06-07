@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 import { donorLabel, patientLabel } from '@/lib/labels'
 import type { Cycle } from '@/lib/types'
 import { sanitizeSaathiMessage } from '@/lib/sanitize'
-import { sharePlacard } from '@/lib/placard'
+import { ImpactPlacard } from '@/components/ImpactPlacard'
 import { useRequireRole } from '@/lib/useRequireRole'
 import type { ConversationTurn, DonorInsight, Refusal } from '@/lib/types'
 
@@ -143,45 +143,7 @@ export default function DonorPage() {
         error={error}
       />
       <InsightPill insight={insight} donorId={donorId} />
-      <ShareImpact insight={insight} />
-    </div>
-  )
-}
-
-// Strava-style shareable placard — marketing surface. Generates a PNG client-side.
-function ShareImpact({ insight }: { insight: DonorInsight | null }) {
-  const [busy, setBusy] = useState(false)
-  const lifetime = insight?.lifetime_donations ?? 0
-  const lives = Math.max(1, lifetime)
-  const share = async () => {
-    setBusy(true)
-    try {
-      await sharePlacard({
-        name: insight?.name_used || 'A Marrow donor',
-        livesSustained: lives,
-        lifetimeDonations: lifetime,
-        bloodGroup: 'O Positive',
-        patientName: insight?.patient_bond ? insight.patient_bond.split(' ')[0] : undefined,
-      })
-    } finally {
-      setBusy(false)
-    }
-  }
-  return (
-    <div className="mt-6 p-6 rounded-4xl bg-gradient-to-br from-marrow-700 to-marrow-900 text-marrow-50 shadow-glow flex items-center justify-between gap-4">
-      <div>
-        <h2 className="font-bold tracking-tightest text-lg">Share your impact</h2>
-        <p className="mt-1 text-sm text-marrow-100/80 max-w-sm">
-          You've sustained {lives} {lives === 1 ? 'life' : 'lives'}. Post your constellation — every share recruits the next donor.
-        </p>
-      </div>
-      <button
-        onClick={share}
-        disabled={busy}
-        className="shrink-0 px-5 py-3 rounded-full bg-marrow-50 text-marrow-900 font-semibold hover:bg-white transition-colors disabled:opacity-60"
-      >
-        {busy ? 'Creating…' : 'Share my card'}
-      </button>
+      <ImpactPlacard insight={insight} />
     </div>
   )
 }
