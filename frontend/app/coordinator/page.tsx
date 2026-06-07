@@ -197,13 +197,17 @@ function InsightsPanel({
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="card p-6 lg:col-span-2">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold tracking-tightest text-marrow-900">Blood-group pressure</h3>
-            <span className="eyebrow">demand vs eligible supply · 30d</span>
+            <h3 className="font-bold tracking-tightest text-marrow-900">Upcoming demand by blood group</h3>
+            <span className="eyebrow">next 30 days · with eligible supply</span>
           </div>
           <div className="mt-4 space-y-3">
-            {(insights?.blood_groups ?? []).filter(g => g.due_30 > 0).slice(0, 5).map(g => (
-              <GroupBar key={g.group} group={g.group} demand={g.due_30} supply={g.eligible_supply} status={g.status} />
-            ))}
+            {(() => {
+              const groups = (insights?.blood_groups ?? []).filter(g => g.due_30 > 0).sort((a, b) => b.due_30 - a.due_30).slice(0, 6)
+              const maxDue = Math.max(1, ...groups.map(g => g.due_30))
+              return groups.map(g => (
+                <GroupBar key={g.group} group={g.group} demand={g.due_30} supply={g.eligible_supply} status={g.status} maxDue={maxDue} />
+              ))
+            })()}
             {insights && insights.blood_groups.filter(g => g.due_30 > 0).length === 0 && (
               <p className="text-sm text-marrow-900/60">No demand in the next 30 days.</p>
             )}
@@ -241,28 +245,26 @@ function Kpi({ big, label, sub, dark, warn }: { big: string; label: string; sub?
   )
 }
 
-function GroupBar({ group, demand, supply, status }: { group: string; demand: number; supply: number; status: string }) {
-  const meta: Record<string, { color: string; label: string }> = {
-    shortage: { color: 'bg-marrow-600', label: 'shortage' },
-    tight: { color: 'bg-amber-400', label: 'tight' },
-    ok: { color: 'bg-green-500', label: 'healthy' },
-    idle: { color: 'bg-marrow-200', label: 'idle' },
-  }
-  const m = meta[status] ?? meta.ok
-  // Bar shows how much of demand is covered (capped, supply is usually >> demand).
-  const coverage = demand > 0 ? Math.min(supply / demand, 4) / 4 : 0
+function GroupBar({ group, demand, supply, status, maxDue }: { group: string; demand: number; supply: number; status: string; maxDue: number }) {
+  // Bar = this group's share of the biggest demand, so the busiest groups
+  // visibly dominate. Colour still reflects supply health (shortage/tight/ok).
+  const barColor = status === 'shortage' ? 'bg-marrow-600' : status === 'tight' ? 'bg-amber-400' : 'bg-marrow-500'
+  const width = Math.max((demand / maxDue) * 100, 6)
+  const tight = status === 'shortage' || status === 'tight'
   return (
     <div className="flex items-center gap-3">
       <div className="w-24 shrink-0 text-sm font-medium text-marrow-900">{group}</div>
-      <div className="flex-1 h-2 rounded-full bg-marrow-100 overflow-hidden">
-        <div className={clsx('h-full rounded-full', m.color)} style={{ width: `${Math.max(coverage * 100, 6)}%` }} />
+      <div className="flex-1 h-2.5 rounded-full bg-marrow-100 overflow-hidden">
+        <div className={clsx('h-full rounded-full transition-[width] duration-500', barColor)} style={{ width: `${width}%` }} />
       </div>
       <div className="w-32 shrink-0 text-right text-xs text-marrow-900/60">
         {demand} due · {supply.toLocaleString()} ready
       </div>
-      <span className={clsx('pill', status === 'shortage' ? 'bg-marrow-600 text-white' : status === 'tight' ? 'bg-amber-100 text-amber-800' : 'bg-marrow-100 text-marrow-700')}>
-        {m.label}
-      </span>
+      {tight && (
+        <span className={clsx('pill', status === 'shortage' ? 'bg-marrow-600 text-white' : 'bg-amber-100 text-amber-800')}>
+          {status}
+        </span>
+      )}
     </div>
   )
 }
