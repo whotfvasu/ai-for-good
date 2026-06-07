@@ -21,13 +21,13 @@ export function Navbar() {
     router.replace('/login')
   }
 
-  // Hide the nav chrome entirely on the login page for a clean focus.
-  const onLogin = pathname === '/login'
+  // The login page owns the full viewport (its own branding) — no app bar.
+  if (pathname === '/login') return null
 
   return (
-    <header className="sticky top-0 z-40 backdrop-blur-xl bg-paper/70 border-b border-marrow-100/60">
-      <div className="max-w-7xl mx-auto px-6 lg:px-10 h-16 flex items-center justify-between">
-        <Link href={session ? HOME_FOR[session.role] : '/'} className="flex items-center gap-2 group">
+    <header className="sticky top-0 z-40 glass border-b border-marrow-100/70">
+      <div className="max-w-6xl mx-auto px-6 lg:px-8 h-16 flex items-center justify-between">
+        <Link href={session ? HOME_FOR[session.role] : '/'} className="flex items-center gap-2.5 group">
           <Logo />
           <div className="leading-tight">
             <div className="text-[15px] font-bold tracking-tightest text-marrow-900">Marrow</div>
@@ -35,31 +35,21 @@ export function Navbar() {
           </div>
         </Link>
 
-        {!onLogin && session && (
+        {session ? (
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex flex-col items-end leading-tight">
               <span className="text-sm font-semibold text-marrow-900 max-w-[200px] truncate">{session.name}</span>
-              <span className="text-[10px] uppercase tracking-[0.15em] text-marrow-600/70">
-                {ROLE_LABEL[session.role]}
-              </span>
+              <span className="eyebrow !tracking-[0.15em] text-marrow-600/70">{ROLE_LABEL[session.role]}</span>
             </div>
             <div className="w-9 h-9 rounded-full bg-marrow-900 text-marrow-50 grid place-items-center text-sm font-semibold">
               {session.name.slice(0, 1).toUpperCase()}
             </div>
-            <button
-              onClick={onLogout}
-              className="px-3.5 py-1.5 rounded-full text-sm font-medium text-marrow-800 ring-1 ring-marrow-200/60 hover:bg-marrow-50 transition-colors"
-            >
+            <button onClick={onLogout} className="btn-secondary btn-sm">
               Logout
             </button>
           </div>
-        )}
-
-        {!onLogin && !session && (
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-marrow-600 hover:bg-marrow-700 text-white text-sm font-semibold transition-colors"
-          >
+        ) : (
+          <Link href="/login" className="btn-primary btn-sm">
             Sign in
             <span aria-hidden>→</span>
           </Link>

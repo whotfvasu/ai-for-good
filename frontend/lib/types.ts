@@ -155,6 +155,24 @@ export interface CyclesResponse {
   counts: Partial<Record<CycleState, number>>
 }
 
+export interface BloodGroupInsight {
+  group: string
+  due_30: number
+  eligible_supply: number
+  status: 'shortage' | 'tight' | 'ok' | 'idle'
+}
+
+export interface InsightsResponse {
+  anchor_date: string
+  totals: { patients: number; donors: number; bridges: number }
+  demand: { next_7: number; next_14: number; next_30: number }
+  donor_pool: { eligible: number; resting: number; lapsed: number; active: number; inactive: number }
+  avg_responsiveness: number
+  blood_groups: BloodGroupInsight[]
+  bridges_at_risk: number
+  reengagement_opportunity: number
+}
+
 export interface RunSummary {
   anchor_date: string
   window: number

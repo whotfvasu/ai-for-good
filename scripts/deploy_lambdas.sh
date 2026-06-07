@@ -138,6 +138,7 @@ LAMBDAS=(
   "marrow-distill-insight|backend.distill_insight.handler.lambda_handler"
   "marrow-saathi-chat|backend.saathi_chat.handler.lambda_handler"
   "marrow-bridge|backend.bridge.handler.lambda_handler"
+  "marrow-insights|backend.insights.handler.lambda_handler"
   "marrow-cycle-runner|backend.cycle_runner.handler.lambda_handler"
   "marrow-confirm|backend.confirm.handler.lambda_handler"
   "marrow-cycles|backend.cycles.handler.lambda_handler"

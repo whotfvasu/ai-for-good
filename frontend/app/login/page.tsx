@@ -92,74 +92,122 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] grid lg:grid-cols-2">
-      {/* Left — brand panel */}
-      <div className="hidden lg:flex flex-col justify-between p-12 bg-marrow-900 text-marrow-50 relative overflow-hidden">
-        <div className="absolute -right-20 -top-20 w-96 h-96 rounded-full bg-marrow-700/40 blur-3xl" />
-        <div className="relative">
-          <div className="text-sm uppercase tracking-[0.2em] text-marrow-200/70">Marrow</div>
-          <div className="mt-1 font-bold text-lg">Living Blood Network</div>
+    <div className="min-h-screen grid lg:grid-cols-[1.05fr_1fr]">
+      {/* Left — brand panel (full height, occupies the space) */}
+      <div className="relative hidden lg:flex flex-col justify-between p-14 bg-marrow-900 text-marrow-50 overflow-hidden">
+        <div className="absolute -right-24 -top-24 w-[28rem] h-[28rem] rounded-full bg-marrow-700/40 blur-3xl" />
+        <div className="absolute -left-16 bottom-0 w-72 h-72 rounded-full bg-marrow-600/20 blur-3xl" />
+
+        <div className="relative flex items-center gap-2.5">
+          <Drop />
+          <div className="leading-tight">
+            <div className="text-[15px] font-bold tracking-tightest">Marrow</div>
+            <div className="eyebrow text-marrow-200/70">Living Blood Network</div>
+          </div>
         </div>
+
         <div className="relative">
-          <h1 className="text-4xl font-extrabold tracking-tightest leading-tight">
+          <h1 className="text-4xl xl:text-5xl font-extrabold tracking-tightest leading-[1.05]">
             One secure login.<br />Three focused workspaces.
           </h1>
-          <p className="mt-4 text-marrow-100/80 max-w-sm leading-relaxed">
-            Marrow derives the workspace from the signed-in account. Coordinators, patients, and
-            donors never see an in-app switcher that breaks the CRM model.
+          <p className="mt-5 text-marrow-100/80 max-w-md leading-relaxed">
+            Marrow derives your workspace from the signed-in account. Coordinators, patients, and
+            donors each see only what they need — never an in-app switcher.
           </p>
+
+          <ul className="mt-10 space-y-4 max-w-md">
+            <Feature title="Coordinator" body="An autonomous command center — work only the exceptions." />
+            <Feature title="Patient" body="See your Blood Bridge and your next tentative date." />
+            <Feature title="Donor" body="Saathi remembers you, and your impact, every cycle." />
+          </ul>
         </div>
-        <div className="relative text-xs text-marrow-200/60">Checkpoint demo access · password is cosmetic</div>
+
+        <div className="relative eyebrow text-marrow-200/50">Checkpoint demo access · password is cosmetic</div>
       </div>
 
-      {/* Right — form */}
-      <div className="flex items-center justify-center p-8">
-        <form onSubmit={submit} className="w-full max-w-sm">
+      {/* Right — form, vertically centered in a real card */}
+      <div className="flex items-center justify-center p-6 sm:p-10">
+        <form onSubmit={submit} className="w-full max-w-md card p-8 shadow-soft">
+          {/* compact brand for mobile where the left panel is hidden */}
+          <div className="lg:hidden flex items-center gap-2.5 mb-6">
+            <Drop dark />
+            <span className="font-bold tracking-tightest text-marrow-900">Marrow</span>
+          </div>
+
           <h2 className="text-2xl font-bold tracking-tightest text-marrow-900">Sign in</h2>
           <p className="mt-1 text-sm text-marrow-900/60">Use the assigned account. The workspace is derived automatically.</p>
 
-          <label className="block mt-6 text-xs font-medium text-marrow-900/70">Email</label>
-          <input
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="name@bloodwarriors.org"
-            className="mt-1 w-full px-4 py-2.5 rounded-xl bg-marrow-50 ring-1 ring-marrow-200/60 placeholder:text-marrow-700/30 focus:outline-none focus:ring-2 focus:ring-marrow-400"
-          />
-          <label className="block mt-4 text-xs font-medium text-marrow-900/70">Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="••••••••"
-            className="mt-1 w-full px-4 py-2.5 rounded-xl bg-marrow-50 ring-1 ring-marrow-200/60 placeholder:text-marrow-700/30 focus:outline-none focus:ring-2 focus:ring-marrow-400"
-          />
+          <div className="mt-6 space-y-4">
+            <div>
+              <label className="field-label">Email</label>
+              <input
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="name@bloodwarriors.org"
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="field-label">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="field-label">Demo account</label>
+              <select
+                value={selectedKey}
+                onChange={e => setSelectedKey(e.target.value)}
+                className="input"
+              >
+                {loading && <option>Loading live identities…</option>}
+                {accounts.map(account => (
+                  <option key={account.key} value={account.key}>
+                    {account.name} · {ROLE_LABEL[account.role]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-          <label className="block mt-4 text-xs font-medium text-marrow-900/70">Demo account</label>
-          <select
-            value={selectedKey}
-            onChange={e => setSelectedKey(e.target.value)}
-            className="mt-1 w-full px-4 py-2.5 rounded-xl bg-marrow-50 ring-1 ring-marrow-200/60 focus:outline-none focus:ring-2 focus:ring-marrow-400"
-          >
-            {loading && <option>Loading live identities…</option>}
-            {accounts.map(account => (
-              <option key={account.key} value={account.key}>
-                {account.name} · {ROLE_LABEL[account.role]}
-              </option>
-            ))}
-          </select>
-          <p className="mt-2 text-xs text-marrow-900/45">
-            Demo shortcut only. In production this selector is replaced by Cognito/SSO claims.
-          </p>
-
-          <button
-            type="submit"
-            disabled={!email.trim()}
-            className="mt-6 w-full py-3 rounded-full bg-marrow-600 hover:bg-marrow-700 text-white font-semibold transition-colors disabled:opacity-50"
-          >
+          <button type="submit" disabled={!email.trim()} className="btn-primary btn-lg w-full mt-6">
             Sign in
           </button>
+          <p className="mt-3 text-center text-xs text-marrow-900/45">
+            Demo shortcut. In production this is replaced by Cognito / SSO claims.
+          </p>
         </form>
       </div>
     </div>
+  )
+}
+
+function Feature({ title, body }: { title: string; body: string }) {
+  return (
+    <li className="flex gap-3">
+      <span className="mt-1.5 w-1.5 h-1.5 shrink-0 rounded-full bg-marrow-300" />
+      <div>
+        <div className="font-semibold text-marrow-50">{title}</div>
+        <div className="text-sm text-marrow-100/70 leading-snug">{body}</div>
+      </div>
+    </li>
+  )
+}
+
+function Drop({ dark }: { dark?: boolean }) {
+  return (
+    <svg viewBox="0 0 32 32" className="w-8 h-8" fill="none" aria-hidden>
+      <defs>
+        <radialGradient id="ld" cx="50%" cy="40%" r="60%">
+          <stop offset="0%" stopColor="#ECA0A0" />
+          <stop offset="100%" stopColor={dark ? '#BB2B29' : '#FFE8E8'} />
+        </radialGradient>
+      </defs>
+      <path d="M16 3C10 12 6 17 6 22a10 10 0 0 0 20 0c0-5-4-10-10-19Z" fill="url(#ld)" />
+    </svg>
   )
 }

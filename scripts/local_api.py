@@ -15,6 +15,7 @@ from backend.family_ack.handler import lambda_handler as family_ack_handler
 from backend.forecast.handler import lambda_handler as forecast_handler
 from backend.health.handler import lambda_handler as health_handler
 from backend.bridge.handler import lambda_handler as bridge_handler
+from backend.insights.handler import lambda_handler as insights_handler
 from backend.confirm.handler import lambda_handler as confirm_handler
 from backend.cycle_assign.handler import lambda_handler as cycle_assign_handler
 from backend.cycle_notify.handler import lambda_handler as cycle_notify_handler
@@ -61,6 +62,10 @@ class LocalApiHandler(BaseHTTPRequestHandler):
 
         if parsed.path == "/bridge":
             self.write_lambda_response(bridge_handler(make_event(query), None))
+            return
+
+        if parsed.path == "/insights":
+            self.write_lambda_response(insights_handler(make_event(query), None))
             return
 
         if parsed.path == "/cycles":

@@ -21,6 +21,7 @@ export function ImpactPlacard({ insight }: { insight: DonorInsight | null }) {
   const [format, setFormat] = useState<PlacardFormat>('square')
   const [transparent, setTransparent] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [rendering, setRendering] = useState(true) // drives the blur transition
   const [busy, setBusy] = useState(false)
   const urlRef = useRef<string | null>(null)
 
@@ -37,12 +38,16 @@ export function ImpactPlacard({ insight }: { insight: DonorInsight | null }) {
   }
 
   // Re-render the preview whenever format / background / data changes.
+  // We blur the current frame out, render the new PNG off-thread, then blur it
+  // back in on the image's onLoad — so the canvas work never shows as a stutter.
   const refreshPreview = useCallback(async () => {
+    setRendering(true)
     const blob = await renderPlacard(data, { format, transparent })
     const url = URL.createObjectURL(blob)
-    if (urlRef.current) URL.revokeObjectURL(urlRef.current)
+    const prev = urlRef.current
     urlRef.current = url
-    setPreviewUrl(url)
+    setPreviewUrl(url) // onLoad will clear `rendering` once decoded
+    if (prev) URL.revokeObjectURL(prev)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [format, transparent, lifetime, lives])
 
@@ -53,10 +58,8 @@ export function ImpactPlacard({ insight }: { insight: DonorInsight | null }) {
     }
   }, [refreshPreview])
 
-  const activeRatio = FORMATS.find(f => f.id === format)!.ratio
-
   return (
-    <div className="mt-6 p-6 rounded-4xl bg-white ring-1 ring-marrow-200/60">
+    <div className="card p-6">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="font-bold tracking-tightest text-lg text-marrow-900">Share your impact</h2>
@@ -66,11 +69,41 @@ export function ImpactPlacard({ insight }: { insight: DonorInsight | null }) {
         </div>
       </div>
 
-      <div className="mt-5 grid md:grid-cols-[1fr_minmax(0,320px)] gap-6 items-start">
+      <div className="mt-5 flex flex-col gap-5">
+        {/* Live preview (top) — true aspect ratio per format; the image blurs
+            out/in to mask the canvas re-render so the swap isn't a stutter. */}
+        <div>
+          <div
+            className={clsx(
+              'relative mx-auto w-full max-w-[260px] rounded-2xl overflow-hidden ring-1 ring-marrow-200/60 grid place-items-center',
+              FORMATS.find(f => f.id === format)!.ratio,
+              transparent
+                ? 'bg-[conic-gradient(#eee_90deg,#fff_90deg_180deg,#eee_180deg_270deg,#fff_270deg)] bg-[length:20px_20px]'
+                : 'bg-marrow-50'
+            )}
+          >
+            {previewUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previewUrl}
+                alt="Impact card preview"
+                onLoad={() => setRendering(false)}
+                className={clsx(
+                  'w-full h-full object-cover transition-[opacity,filter,transform] duration-300 ease-out will-change-[opacity,filter,transform]',
+                  rendering ? 'opacity-0 blur-lg scale-95' : 'opacity-100 blur-0 scale-100'
+                )}
+              />
+            )}
+            {rendering && <span className="absolute text-marrow-900/30 text-xs">Rendering…</span>}
+          </div>
+          {transparent && (
+            <p className="mt-2 text-center text-[11px] text-marrow-900/50">Transparent PNG — drop it over your photo</p>
+          )}
+        </div>
+
         {/* Controls */}
-        <div className="order-2 md:order-1">
-          {/* Format */}
-          <div className="text-[10px] uppercase tracking-[0.15em] text-marrow-700/70">Format</div>
+        <div>
+          <div className="eyebrow">Format</div>
           <div className="mt-2 grid grid-cols-3 gap-2">
             {FORMATS.map(f => (
               <button
@@ -91,8 +124,7 @@ export function ImpactPlacard({ insight }: { insight: DonorInsight | null }) {
             ))}
           </div>
 
-          {/* Background */}
-          <div className="mt-4 text-[10px] uppercase tracking-[0.15em] text-marrow-700/70">Background</div>
+          <div className="mt-4 eyebrow">Background</div>
           <div className="mt-2 grid grid-cols-2 gap-2">
             <button
               onClick={() => setTransparent(false)}
@@ -114,7 +146,6 @@ export function ImpactPlacard({ insight }: { insight: DonorInsight | null }) {
             </button>
           </div>
 
-          {/* Actions */}
           <div className="mt-5 flex gap-2">
             <button
               onClick={async () => {
@@ -126,40 +157,14 @@ export function ImpactPlacard({ insight }: { insight: DonorInsight | null }) {
                 }
               }}
               disabled={busy}
-              className="flex-1 px-5 py-3 rounded-full bg-marrow-600 hover:bg-marrow-700 text-white font-semibold transition-colors disabled:opacity-60"
+              className="btn-primary btn-md flex-1"
             >
               {busy ? 'Working…' : 'Share'}
             </button>
-            <button
-              onClick={() => downloadPlacard(data, { format, transparent })}
-              className="px-5 py-3 rounded-full bg-marrow-50 ring-1 ring-marrow-200/60 text-marrow-900 font-semibold hover:bg-marrow-100 transition-colors"
-            >
+            <button onClick={() => downloadPlacard(data, { format, transparent })} className="btn-secondary btn-md">
               Download
             </button>
           </div>
-        </div>
-
-        {/* Live preview */}
-        <div className="order-1 md:order-2">
-          <div
-            className={clsx(
-              'mx-auto w-full max-w-[280px] rounded-2xl overflow-hidden ring-1 ring-marrow-200/60',
-              activeRatio,
-              transparent && 'bg-[conic-gradient(#eee_90deg,#fff_90deg_180deg,#eee_180deg_270deg,#fff_270deg)] bg-[length:24px_24px]'
-            )}
-          >
-            {previewUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={previewUrl} alt="Impact card preview" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full grid place-items-center text-marrow-900/30 text-sm">Rendering…</div>
-            )}
-          </div>
-          {transparent && (
-            <p className="mt-2 text-center text-[11px] text-marrow-900/50">
-              Transparent PNG — drop it over your own photo
-            </p>
-          )}
         </div>
       </div>
     </div>

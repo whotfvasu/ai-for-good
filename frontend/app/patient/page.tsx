@@ -30,13 +30,13 @@ export default function PatientPage() {
   const tentativeDonor = bridge?.donors.find(d => d.eligible) ?? bridge?.donors[0]
 
   return (
-    <div className="max-w-5xl mx-auto px-6 lg:px-10 py-10">
+    <div className="app-page">
       {error && (
         <div className="mb-6 p-4 rounded-2xl bg-marrow-100 text-marrow-900 text-sm ring-1 ring-marrow-300">{error}</div>
       )}
 
       {/* Tentative date alert */}
-      <div className="rounded-5xl bg-fade-pink ring-1 ring-marrow-200/60 p-8 lg:p-12 shadow-soft">
+      <div className="card bg-fade-pink p-8 lg:p-10 shadow-soft">
         <span className="pill bg-white text-marrow-700 ring-1 ring-marrow-200/60">
           <span className="w-1.5 h-1.5 rounded-full bg-marrow-600 animate-pulse" />
           Tentative transfusion alert
@@ -63,15 +63,23 @@ export default function PatientPage() {
           <button
             disabled={confirmed}
             onClick={async () => {
+              // Write the family's attendance confirmation into the real cycle
+              // ledger (cycle_id = patient_id::next_needed_date). If the cycle
+              // hasn't been created yet (coordinator hasn't run a pass), fall
+              // back to the lightweight ack so the UI still responds.
               try {
-                await api.familyAck(
-                  bridge ? `cyc_${bridge.patient_id}_${bridge.next_needed_date}` : 'cyc_demo'
-                )
+                if (bridge?.next_needed_date) {
+                  await api.confirm(`${bridge.patient_id}::${bridge.next_needed_date}`, 'patient', 'yes')
+                } else {
+                  await api.familyAck('cyc_demo')
+                }
+              } catch {
+                await api.familyAck('cyc_demo').catch(() => {})
               } finally {
                 setConfirmed(true)
               }
             }}
-            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-marrow-900 hover:bg-marrow-800 text-marrow-50 font-semibold disabled:opacity-60 transition-colors"
+            className="btn-dark btn-lg"
           >
             {confirmed ? '✓ Date confirmed' : 'Confirm this date works'}
           </button>
@@ -88,10 +96,10 @@ export default function PatientPage() {
       </div>
 
       {/* The bridge */}
-      <section className="mt-8">
-        <div className="flex items-end justify-between">
+      <section className="mt-10">
+        <div className="flex items-end justify-between mb-4">
           <div>
-            <h2 className="text-2xl font-bold tracking-tightest text-marrow-900">Your Blood Bridge</h2>
+            <h2 className="section-title">Your Blood Bridge</h2>
             <p className="mt-1 text-sm text-marrow-900/60">
               {bridge
                 ? `${bridge.pool_size} donors share your blood group (${bridge.bridge_blood_group}) and rotate to sustain you`
@@ -106,7 +114,7 @@ export default function PatientPage() {
           )}
         </div>
 
-        <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {loading &&
             Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="h-28 rounded-3xl bg-marrow-50 animate-pulse" />
@@ -131,7 +139,7 @@ function BridgeDonorCard({ donor }: { donor: BridgeDonor }) {
   }
   const m = stateMeta[donor.rotation_state]
   return (
-    <div className="p-5 rounded-3xl bg-white ring-1 ring-marrow-200/60">
+    <div className="card p-5">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-full bg-marrow-900 text-marrow-50 grid place-items-center font-semibold">
           {donorLabel(donor.donor_id).slice(6, 7).toUpperCase()}

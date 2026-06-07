@@ -148,6 +148,22 @@ export const mocks = {
     })),
   }),
 
+  insights: () => ({
+    anchor_date: today(),
+    totals: { patients: 84, donors: 4826, bridges: 79 },
+    demand: { next_7: 22, next_14: 48, next_30: 76 },
+    donor_pool: { eligible: 4342, resting: 484, lapsed: 1033, active: 4153, inactive: 673 },
+    avg_responsiveness: 0.61,
+    blood_groups: [
+      { group: 'O Positive', due_30: 30, eligible_supply: 1814, status: 'ok' as const },
+      { group: 'B Positive', due_30: 18, eligible_supply: 1402, status: 'ok' as const },
+      { group: 'A Positive', due_30: 7, eligible_supply: 2651, status: 'ok' as const },
+      { group: 'AB Positive', due_30: 5, eligible_supply: 3200, status: 'ok' as const },
+    ],
+    bridges_at_risk: 6,
+    reengagement_opportunity: 1033,
+  }),
+
   runCycles: (): RunSummary => ({
     anchor_date: today(),
     window: 14,

@@ -60,6 +60,7 @@ ROUTES=(
   "GET /forecast marrow-forecast"
   "GET /rank-donors marrow-rank-donors"
   "GET /bridge marrow-bridge"
+  "GET /insights marrow-insights"
   "POST /family/ack marrow-family-ack"
   "POST /cycle/run marrow-cycle-runner"
   "GET /cycles marrow-cycles"

@@ -126,24 +126,29 @@ export default function DonorPage() {
     await loadPendingCycle()
   }
 
-  if (!ready) return <div className="max-w-4xl mx-auto px-6 py-20 text-center text-marrow-900/40">Loading…</div>
+  if (!ready) return <div className="app-page text-center text-marrow-900/40 py-20">Loading…</div>
 
   return (
-    <div className="max-w-4xl mx-auto px-4 lg:px-6 py-8">
+    <div className="app-page">
       {pendingCycle && <ActionBanner cycle={pendingCycle} onRespond={respond} />}
-      <ChatCard
-        donorId={donorId}
-        turns={turns}
-        sending={sending}
-        scrollRef={scrollRef}
-        insight={insight}
-        draft={draft}
-        setDraft={setDraft}
-        send={send}
-        error={error}
-      />
-      <InsightPill insight={insight} donorId={donorId} />
-      <ImpactPlacard insight={insight} />
+      <div className="grid lg:grid-cols-3 gap-6 items-start">
+        <div className="lg:col-span-2">
+          <ChatCard
+            donorId={donorId}
+            turns={turns}
+            sending={sending}
+            scrollRef={scrollRef}
+            insight={insight}
+            draft={draft}
+            setDraft={setDraft}
+            send={send}
+            error={error}
+          />
+        </div>
+        <div className="space-y-6">
+          <ImpactPlacard insight={insight} />
+        </div>
+      </div>
     </div>
   )
 }
@@ -195,7 +200,7 @@ function ChatCard({
   const eligibilityChip = useMemo(() => eligibilityLabel(insight), [insight])
 
   return (
-    <div className="rounded-5xl ring-1 ring-marrow-200/60 bg-white shadow-soft overflow-hidden">
+    <div className="card shadow-soft overflow-hidden">
       <header className="px-6 py-4 border-b border-marrow-100 flex items-center gap-3 bg-fade-pink">
         <div className="w-10 h-10 rounded-full bg-marrow-900 text-marrow-50 grid place-items-center font-semibold">
           {(insight?.name_used || 'D').slice(0, 1)}
@@ -270,60 +275,6 @@ function ChatCard({
   )
 }
 
-function InsightPill({ insight, donorId }: { insight: DonorInsight | null; donorId: string | null }) {
-  if (!donorId) return null
-  if (!insight) {
-    return (
-      <div className="mt-8 p-6 rounded-4xl bg-white ring-1 ring-marrow-200/60">
-        <h2 className="font-bold tracking-tightest text-marrow-900">About you (cold memory)</h2>
-        <p className="mt-2 text-sm text-marrow-900/60">
-          No distilled insight yet — this donor's chat history hasn't been compressed by Saathi.
-        </p>
-      </div>
-    )
-  }
-  return (
-    <div className="mt-8 p-6 rounded-4xl bg-white ring-1 ring-marrow-200/60">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="font-bold tracking-tightest text-marrow-900">About you (cold memory)</h2>
-        <span className="text-[10px] uppercase tracking-[0.15em] text-marrow-700/70">
-          updated {timeAgo(insight.updated_at)}
-        </span>
-      </div>
-      <p className="mt-3 text-sm leading-relaxed text-marrow-900">{insight.summary_120w}</p>
-      <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-        <Fact label="Engagement" value={insight.engagement_state} />
-        <Fact label="Language" value={insight.preferred_language.toUpperCase()} />
-        <Fact label="Best time" value={insight.preferred_time_window} />
-        <Fact label="Channel" value={insight.preferred_channel} />
-      </div>
-      {(insight.what_motivates?.length || 0) > 0 && (
-        <div className="mt-4 flex flex-wrap gap-1.5">
-          <span className="text-[10px] uppercase tracking-[0.15em] text-marrow-700/70 mr-1">Motivates:</span>
-          {insight.what_motivates.map(m => (
-            <span key={m} className="pill bg-marrow-100 text-marrow-700">{m}</span>
-          ))}
-        </div>
-      )}
-      {insight.last_refusal_reason && (
-        <div className="mt-3 text-xs text-marrow-700">
-          Last "no" — <strong>{insight.last_refusal_reason}</strong>
-          {insight.last_refusal_expires_at && ` · respect until ${insight.last_refusal_expires_at}`}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="p-3 rounded-2xl bg-marrow-50/60 ring-1 ring-marrow-100">
-      <div className="text-[10px] uppercase tracking-[0.12em] text-marrow-700/70">{label}</div>
-      <div className="mt-0.5 font-semibold text-marrow-900 capitalize">{value}</div>
-    </div>
-  )
-}
-
 function Bubble({
   role,
   text,
@@ -357,18 +308,6 @@ function eligibilityLabel(insight: DonorInsight | null): string {
   if (insight.engagement_state === 'drifting') return 'Drifting'
   if (insight.engagement_state === 'dormant') return 'Dormant'
   return 'Lapsed'
-}
-
-function timeAgo(iso: string): string {
-  try {
-    const diffSec = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000))
-    if (diffSec < 60) return 'just now'
-    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`
-    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`
-    return `${Math.floor(diffSec / 86400)}d ago`
-  } catch {
-    return ''
-  }
 }
 
 // The donor's open ask — the real-world action that arrives on WhatsApp too.

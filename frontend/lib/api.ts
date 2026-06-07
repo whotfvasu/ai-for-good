@@ -28,6 +28,7 @@ import type {
   CyclesResponse,
   DonorInsight,
   ForecastResponse,
+  InsightsResponse,
   NotifyDonorResponse,
   RankDonorsResponse,
   Refusal,
@@ -94,6 +95,15 @@ export const api = {
     const q = new URLSearchParams({ patient_id })
     if (merged.anchor_date) q.set('anchor_date', merged.anchor_date)
     return request<BridgeResponse>(`/bridge?${q.toString()}`)
+  },
+
+  // Network analytics for the coordinator dashboard.
+  insights: (anchor_date?: string) => {
+    if (FULL_MOCKS) return Promise.resolve(mocks.insights())
+    const merged = withAnchor({ anchor_date })
+    const q = new URLSearchParams()
+    if (merged.anchor_date) q.set('anchor_date', merged.anchor_date)
+    return request<InsightsResponse>(`/insights?${q.toString()}`)
   },
 
   // ── Autonomous Confirmation Loop ─────────────────────────────────────────
